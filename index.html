@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Simulateur d'optique cinéma · Angénieux Optimo Ultra 12x</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout : banc optique — réglages autour d'un schéma optique animé et d'un moniteur de retour, bagues de l'objectif en bas. Thème sombre unique (outil de prise de vue). */
+:root{
+  --body:#131415; --panel:#1b1d1f; --raised:#24272a; --line:#34383c; --line-soft:#2a2d30;
+  --ink:#ece8df; --muted:#9b9d98; --dim:#6d706c;
+  --amber:#efb43f; --amber-ink:#1a1408; --red:#d9442f; --green:#7fbf6a; --sky:#8fc3ea;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--body);color:var(--ink);font-family:var(--f-body);font-size:13px;margin:0;overflow:hidden}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-columns:272px minmax(0,1fr) 284px;grid-template-areas:"title title title" "top top top" "left vf right" "bar bar bar"}
+.titlebar{grid-area:title;padding:9px 16px;background:var(--amber);color:var(--amber-ink);font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.04em;text-align:center;text-wrap:balance}
+.titlebar a{color:inherit;text-decoration:none;border-bottom:1.5px solid currentColor}
+.titlebar a:hover{border-bottom-style:dotted}
+.top{grid-area:top;display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line-soft);min-width:0}
+.top .brand{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.top .brand small{font-weight:500;color:var(--muted);letter-spacing:.12em;font-size:13px;margin-left:8px}
+.top .scene{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.top .spacer{flex:1}
+.mode{font-family:var(--f-display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;gap:6px;align-items:center;white-space:nowrap}
+.mode b{background:var(--amber);color:var(--amber-ink);padding:1px 7px;border-radius:3px;font-weight:700}
+
+.panel{background:var(--panel);overflow-y:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel.left{grid-area:left;border-right:1px solid var(--line-soft)}
+.panel.right{grid-area:right;border-left:1px solid var(--line-soft)}
+.group{display:flex;flex-direction:column;gap:10px}
+.group h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);display:flex;align-items:center;gap:8px}
+.group h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label,.lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.field label output,.lab output{font-family:var(--f-mono);color:var(--ink);text-transform:none;letter-spacing:0;font-size:12px}
+select{background:var(--raised);border:1px solid var(--line);border-radius:4px;padding:7px 8px;width:100%;min-width:0}
+input[type=range]{width:100%;accent-color:var(--amber);margin:2px 0}
+.spec{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);line-height:1.55;font-variant-numeric:tabular-nums}
+.spec b{color:var(--ink);font-weight:500}
+.spec .ok{color:var(--green)} .spec .ko{color:#f08a74}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.seg.two{grid-template-columns:repeat(2,1fr)}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+.seg button{background:var(--raised);border:1px solid var(--line);border-radius:4px;padding:6px 4px;font-size:11.5px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--amber);color:var(--amber-ink);border-color:var(--amber);font-weight:600}
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer}
+.toggle input{accent-color:var(--amber)}
+.toggle i{display:inline-block;width:14px;height:3px;border-radius:2px}
+.dofbar{position:relative;height:22px;border-radius:3px;background:var(--raised);border:1px solid var(--line);overflow:hidden}
+.dofbar .zone{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--amber) 35%,transparent);border-left:1px solid var(--amber);border-right:1px solid var(--amber)}
+.dofbar .pt{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink)}
+.dofbar .obj{position:absolute;top:2px;width:6px;height:6px;border-radius:50%;transform:translateX(-50%)}
+.dofbar .ticks{position:absolute;inset:auto 0 0 0;display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:9px;color:var(--dim);padding:0 3px;line-height:1}
+.btn{background:var(--raised);border:1px solid var(--line);border-radius:4px;padding:8px 10px;cursor:pointer;font-size:12px;text-align:center}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--amber);color:var(--amber-ink);border-color:var(--amber);font-weight:600}
+.btn.small{padding:5px 8px;font-size:11.5px}
+.row{display:flex;gap:6px}
+.row>*{flex:1}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.5}
+.hint kbd{font-family:var(--f-mono);font-size:10.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;color:var(--ink)}
+.hint ol{margin:4px 0 0;padding-left:18px}
+.hint li{margin:2px 0}
+
+/* zone centrale : schéma optique + moniteur */
+.vf{grid-area:vf;position:relative;background:#0a0a0b;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.optics{position:relative;flex:0 0 44%;min-height:0;border-bottom:1px solid var(--line-soft);background:radial-gradient(ellipse at 50% 50%,#121417,#0a0a0b 75%)}
+.optics canvas{display:block;width:100%;height:100%;cursor:default}
+.optics .tag{position:absolute;left:10px;bottom:6px;font-family:var(--f-display);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+.stepcard{position:absolute;right:10px;top:42px;width:min(330px,46%);background:rgba(27,29,31,.94);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:4px;padding:8px 10px;font-size:11.5px;line-height:1.45;pointer-events:none}
+.stepcard h4{margin:0 0 4px;font-family:var(--f-display);font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);font-weight:600}
+.stepcard .m{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stepcard .m b{color:var(--ink);font-weight:500}
+.explain{flex:0 0 auto;padding:7px 14px;background:var(--panel);border-bottom:1px solid var(--line-soft);font-size:12px;line-height:1.5;color:var(--ink);min-height:44px}
+.explain b{color:var(--amber);font-weight:600}
+.explain .mv{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.explain .mv em{font-style:normal;color:var(--ink)}
+.monitor{position:relative;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px}
+.frame{position:relative;max-width:100%;max-height:100%;aspect-ratio:16/9;box-shadow:0 0 0 1px #2a2d30,0 0 0 7px #161718,0 0 0 8px #2a2d30}
+.frame canvas{display:block;width:100%;height:100%;cursor:crosshair}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.grid3{position:absolute;inset:0;background:
+  linear-gradient(to right,transparent calc(33.333% - .5px),rgba(255,255,255,.28) calc(33.333% - .5px),rgba(255,255,255,.28) calc(33.333% + .5px),transparent calc(33.333% + .5px),transparent calc(66.666% - .5px),rgba(255,255,255,.28) calc(66.666% - .5px),rgba(255,255,255,.28) calc(66.666% + .5px),transparent calc(66.666% + .5px)),
+  linear-gradient(to bottom,transparent calc(33.333% - .5px),rgba(255,255,255,.28) calc(33.333% - .5px),rgba(255,255,255,.28) calc(33.333% + .5px),transparent calc(33.333% + .5px),transparent calc(66.666% - .5px),rgba(255,255,255,.28) calc(66.666% - .5px),rgba(255,255,255,.28) calc(66.666% + .5px),transparent calc(66.666% + .5px))}
+.evf{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:6px 10px;background:linear-gradient(transparent,rgba(0,0,0,.65));font-family:var(--f-mono);font-size:12px;color:#f1eee6;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #000}
+.evf .em{color:var(--amber)}
+.evf-top{position:absolute;left:10px;right:10px;top:8px;display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:#f1eee6;text-shadow:0 1px 2px #000;gap:10px}
+.evf-top .rec{color:var(--red)}
+.meter{position:relative;height:26px;font-family:var(--f-mono);font-size:10px;color:var(--muted)}
+.meter .scale{position:absolute;left:6px;right:6px;top:4px;height:8px;border-bottom:1px solid var(--line);background:repeating-linear-gradient(to right,var(--muted) 0 1px,transparent 1px calc(100%/18))}
+.meter .zero{position:absolute;left:50%;top:0;width:2px;height:14px;background:var(--ink);transform:translateX(-50%)}
+.meter .needle{position:absolute;top:13px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid var(--amber);transform:translateX(-50%);transition:left .15s}
+.meter .needle.over{border-bottom-color:var(--red)}
+.meter .lbls{position:absolute;left:0;right:0;bottom:-2px;display:flex;justify-content:space-between}
+.minimap{position:relative;width:100%;border:1px solid var(--line);border-radius:4px;background:#101214;overflow:hidden;cursor:crosshair;touch-action:none}
+.minimap canvas{width:100%;display:block}
+.minimap span{position:absolute;left:6px;top:4px;font-family:var(--f-mono);font-size:10px;color:var(--muted);pointer-events:none}
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:var(--muted);font-family:var(--f-mono);font-size:12px;background:#0a0a0b;text-align:center;padding:16px;z-index:5}
+.loading .bar{width:220px;max-width:70%;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.loading .bar i{display:block;height:100%;width:30%;background:var(--amber);animation:load 1.2s ease-in-out infinite}
+@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+
+/* barre du bas : bagues de l'objectif */
+.lensbar{grid-area:bar;display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr)) auto;align-items:center;gap:14px;padding:10px 16px;border-top:1px solid var(--line-soft);background:var(--panel)}
+.ring{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ring .lab{font-family:var(--f-display);font-size:12px;letter-spacing:.14em}
+.ring canvas{width:100%;height:44px;display:block;border-radius:4px;border:1px solid var(--line);background:#0e0f10;cursor:ew-resize;touch-action:none}
+.dolly{display:flex;flex-direction:column;gap:4px;align-items:center}
+.dolly .pad{display:grid;grid-template-columns:repeat(2,40px);gap:4px}
+.dolly button{height:30px;background:var(--raised);border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:13px;touch-action:none;user-select:none;-webkit-user-select:none}
+.dolly button:active{background:var(--amber);color:var(--amber-ink)}
+.dolly span{font-family:var(--f-display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.where{display:flex;flex-direction:column;gap:2px;font-family:var(--f-mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.where b{color:var(--ink);font-weight:500}
+
+@media (max-width:1100px){
+  body{overflow:auto}
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto auto auto;grid-template-areas:"title" "top" "vf" "bar" "left" "right"}
+  .titlebar{font-size:15px}
+  .vf{height:auto}
+  .optics{flex:none;height:min(60vw,360px)}
+  .monitor{flex:none;height:min(60vw,520px)}
+  .panel{overflow:visible;border:0!important;border-top:1px solid var(--line-soft)!important}
+  .lensbar{grid-template-columns:1fr 1fr;grid-template-areas:"dolly where" "r1 r1" "r2 r2" "r3 r3"}
+  .lensbar .dolly{grid-area:dolly;align-items:flex-start}
+  .lensbar .where{grid-area:where}
+  #ringFocusW{grid-area:r1} #ringZoomW{grid-area:r2} #ringIrisW{grid-area:r3}
+  .top .scene{display:none}
+  .stepcard{width:min(300px,60%)}
+  .top{flex-wrap:wrap}
+  .top .brand{white-space:normal;font-size:17px}
+  .evf-top,.evf{font-size:10px;gap:8px}
+}
+@media (prefers-reduced-motion:reduce){.loading .bar i{animation:none}}
+</style>
+</head><body>
+<div class="app">
+  <div class="titlebar">Atelier optique JC Fouché 2026 - <a href="https://www.lehubnumerique.com" target="_blank" rel="noopener">www.lehubnumerique.com</a></div>
+  <header class="top">
+    <div class="brand">Angénieux Optimo Ultra 12x<small id="hdrLens">24-290 mm T2.8 · S35</small></div>
+    <div class="scene">Sony VENICE 2 · un personnage, un arbre 10 m derrière, un projecteur HMI 20 m derrière · plein jour</div>
+    <div class="spacer"></div>
+    <div class="mode"><b>MF</b> <span id="hdrLook">S-Cinetone</span></div>
+  </header>
+
+  <aside class="panel left" aria-label="Capteur, optique et scène">
+    <section class="group">
+      <h2>Capteur · Sony VENICE 2</h2>
+      <div class="seg" role="group" aria-label="Format du capteur" id="segFmt">
+        <button type="button" data-fmt="FF" aria-pressed="false">24×36</button>
+        <button type="button" data-fmt="S35" aria-pressed="true">Super 35</button>
+        <button type="button" data-fmt="B4" aria-pressed="false">2/3″</button>
+      </div>
+      <div class="field"><label for="selLook">Courbe de rendu</label>
+        <select id="selLook"><option value="scinetone" selected>S-Cinetone</option><option value="709">Rec.709 (s709)</option><option value="slog3">S-Log3 (plat, à étalonner)</option></select></div>
+      <div class="spec" id="sensorSpec"></div>
+    </section>
+    <section class="group">
+      <h2>Optique</h2>
+      <div class="seg two" role="group" aria-label="Groupe arrière de l'optique" id="segLens">
+        <button type="button" data-lens="S35" aria-pressed="true">Arrière S35<br>24-290 T2.8</button>
+        <button type="button" data-lens="FF" aria-pressed="false">Arrière FF/VV<br>36-435 T4.2</button>
+      </div>
+      <div class="spec" id="lensSpec"></div>
+      <p class="hint" style="margin:0" id="lensHint"></p>
+    </section>
+    <section class="group">
+      <h2>Plan de scène</h2>
+      <div class="minimap" id="planWrap" title="Cliquez pour placer la caméra"><canvas id="plan" width="480" height="230"></canvas><span>vue de côté</span></div>
+      <div class="field"><label for="rngDist">Caméra → personnage <output id="outDist">3,5 m</output></label><input type="range" id="rngDist" min="100" max="2000" step="5" value="350"></div>
+      <label class="toggle"><input type="checkbox" id="chkTree" checked> Arbre (10 m derrière)</label>
+      <label class="toggle"><input type="checkbox" id="chkSpot" checked> Projecteur HMI (20 m derrière)</label>
+      <label class="toggle"><input type="checkbox" id="chkFlare" checked> Flares et reflets parasites</label>
+    </section>
+    <section class="group">
+      <h2>Exposition</h2>
+      <div class="seg two" role="group" aria-label="ISO de base" id="segIso">
+        <button type="button" data-iso="800" aria-pressed="true">ISO 800</button>
+        <button type="button" data-iso="3200" aria-pressed="false">ISO 3200</button>
+      </div>
+      <div class="field"><label for="rngLux">Éclairement (plein jour) <output id="outLux">25 000 lux</output></label><input type="range" id="rngLux" min="0" max="100" step="1" value="70"></div>
+      <div class="field"><label for="rngNd">Filtre ND interne <output id="outNd">clair</output></label><input type="range" id="rngNd" min="0" max="8" step="1" value="8"></div>
+      <div class="field">
+        <span class="lab">Exposition du sujet <output id="outMeter">±0,0 IL</output></span>
+        <div class="meter" aria-hidden="true"><div class="scale"></div><div class="zero"></div><div class="needle" id="needle" style="left:50%"></div><div class="lbls"><span>−3</span><span>−2</span><span>−1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span></div></div>
+      </div>
+    </section>
+  </aside>
+
+  <main class="vf" id="vf">
+    <div class="optics" id="opticsWrap">
+      <canvas id="optics" aria-label="Schéma optique en coupe : groupes de lentilles et rayons lumineux"></canvas>
+      <div class="stepcard" id="stepcard" hidden></div>
+    </div>
+    <div class="explain" id="explain" role="status"></div>
+    <div class="monitor">
+      <div class="frame" id="frame">
+        <canvas id="mon" width="1024" height="576" aria-label="Moniteur de retour VENICE"></canvas>
+        <div class="overlay">
+          <div class="grid3" id="grid3" hidden></div>
+          <div class="evf-top"><span id="evfL">VENICE · S-Cinetone</span><span id="evfR">ISO 500 · ND clair</span></div>
+          <div class="evf" id="evf"></div>
+        </div>
+        <div class="loading" id="loading"><div>Calcul des cames de zoom…</div><div class="bar"><i></i></div></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel right" aria-label="Mise au point, tirage et rayons">
+    <section class="group">
+      <h2>Mise au point (front focus)</h2>
+      <div class="field"><label for="rngFocus">Distance de netteté <output id="outFocus">3,5 m</output></label><input type="range" id="rngFocus" min="0" max="1000" step="1" value="500"></div>
+      <div class="row"><button type="button" class="btn small" data-fp="subj">Net : sujet</button><button type="button" class="btn small" data-fp="tree">arbre</button><button type="button" class="btn small" data-fp="spot">projecteur</button></div>
+      <div class="field">
+        <span class="lab">Profondeur de champ <output id="outDof">—</output></span>
+        <div class="dofbar" id="dofbar"><div class="zone" id="dofZone"></div><div class="pt" id="dofPt"></div><i class="obj" id="dofS" style="background:var(--amber)"></i><i class="obj" id="dofT" style="background:var(--green)"></i><i class="obj" id="dofL" style="background:var(--sky)"></i><div class="ticks"><span>1</span><span>2</span><span>5</span><span>10</span><span>20</span><span>∞</span></div></div>
+      </div>
+      <div class="spec" id="focusSpec"></div>
+      <label class="toggle"><input type="checkbox" id="chkPeak"> Aide à la netteté (peaking)</label>
+    </section>
+    <section class="group">
+      <h2>Zoom et iris</h2>
+      <div class="field"><label for="rngZoom">Focale <output id="outZoom">75 mm</output></label><input type="range" id="rngZoom" min="0" max="1000" step="1" value="400"></div>
+      <div class="field"><label for="rngIris">Diaphragme <output id="outIris">T2.8</output></label><input type="range" id="rngIris" min="0" max="18" step="1" value="0"></div>
+    </section>
+    <section class="group">
+      <h2>Tirage optique (back focus)</h2>
+      <div class="field"><label for="rngBf">Groupe arrière <output id="outBf">0,000 mm</output></label><input type="range" id="rngBf" min="-500" max="500" step="1" value="0"></div>
+      <div class="row"><button type="button" class="btn small" id="btnBfRnd">Dérégler</button><button type="button" class="btn small" id="btnBfZero">Calage usine</button></div>
+      <div class="hint"><b style="color:var(--ink)">Régler le tirage</b>
+        <ol><li>Ouvrir à pleine ouverture.</li><li>Zoomer à fond (télé), faire le point sur le visage avec la bague de mise au point.</li><li>Dézoomer à fond (grand angle) sans toucher la mise au point.</li><li>Si l'image est floue, régler le tirage jusqu'à la netteté.</li><li>Recommencer jusqu'à ce que la netteté tienne sur toute la plage.</li></ol></div>
+    </section>
+    <section class="group">
+      <h2>Rayons et étapes</h2>
+      <label class="toggle"><input type="checkbox" id="rSubj" checked><i style="background:var(--amber)"></i> Rayons du personnage</label>
+      <label class="toggle"><input type="checkbox" id="rTree" checked><i style="background:var(--green)"></i> Rayons de l'arbre</label>
+      <label class="toggle"><input type="checkbox" id="rSpot" checked><i style="background:var(--sky)"></i> Rayons du projecteur</label>
+      <label class="toggle"><input type="checkbox" id="rField"><i style="background:#d9d3c6"></i> Faisceau du bord de cadre</label>
+      <div class="field"><span class="lab">Échelle verticale du schéma</span>
+        <div class="seg" role="group" aria-label="Exagération verticale" id="segVex"><button type="button" data-vex="1" aria-pressed="true">×1</button><button type="button" data-vex="2" aria-pressed="false">×2</button><button type="button" data-vex="4" aria-pressed="false">×4</button></div></div>
+      <div class="field"><label for="rngStep">Pas à pas, verre après verre <output id="outStep">tout</output></label><input type="range" id="rngStep" min="0" max="20" step="1" value="20"></div>
+      <div class="row"><button type="button" class="btn small" id="btnPlay">▶ Lecture</button><button type="button" class="btn small" id="btnAll">Tout afficher</button></div>
+      <label class="toggle"><input type="checkbox" id="chkLoupe" checked> Loupe sur le capteur</label>
+    </section>
+    <section class="group">
+      <h2>Cames de zoom</h2>
+      <div class="minimap"><canvas id="cam" width="480" height="300"></canvas></div>
+      <p class="hint" style="margin:0">Position de chaque groupe (horizontal, de la frontale vers le capteur) selon la focale (vertical). Le variateur glisse régulièrement, le compensateur suit une courbe pour garder l'image au même endroit.</p>
+      <label class="toggle"><input type="checkbox" id="chkGrid"> Grille des tiers sur le moniteur</label>
+      <p class="hint" style="margin:0">Molette sur le moniteur = zoom · <kbd>Maj</kbd>+molette = mise au point · <kbd>↑</kbd><kbd>↓</kbd> avancer/reculer · <kbd>←</kbd><kbd>→</kbd> zoom · <kbd>[</kbd><kbd>]</kbd> point · <kbd>T</kbd>/<kbd>Y</kbd> iris</p>
+    </section>
+  </aside>
+
+  <footer class="lensbar">
+    <div class="dolly"><span>Travelling</span><div class="pad"><button type="button" data-dolly="1" aria-label="Avancer vers le personnage">▲</button><button type="button" data-dolly="-1" aria-label="Reculer">▼</button></div></div>
+    <div class="ring" id="ringFocusW"><span class="lab">Bague de mise au point <output id="rfOut"></output></span><canvas id="ringFocus" aria-label="Bague de mise au point, glisser horizontalement"></canvas></div>
+    <div class="ring" id="ringZoomW"><span class="lab">Bague de zoom <output id="rzOut"></output></span><canvas id="ringZoom" aria-label="Bague de zoom, glisser horizontalement"></canvas></div>
+    <div class="ring" id="ringIrisW"><span class="lab">Bague d'iris <output id="riOut"></output></span><canvas id="ringIris" aria-label="Bague d'iris, glisser horizontalement"></canvas></div>
+    <div class="where" id="where"></div>
+  </footer>
+</div>
+<script>
+/* Modèle paraxial pédagogique de l'Optimo Ultra 12x : groupes de lentilles minces calibrés */
+const OPTICS = (function(){
+  // Chaque groupe : focale cible F (mm), éléments {d: espacement relatif, w: poids de puissance (signe = conv/div), shape, n: nom}
+  const GROUPS = {
+    G1a:{name:'Lentille frontale (fixe)',short:'Frontale',role:'fixe',F:-150,els:[
+      {d:-6,w:-1.5,shape:'menisc-',n:'Ménisque divergent frontal Ø162'},{d:6,w:0.5,shape:'bicx',n:'Convergente frontale'}]},
+    G1b:{name:'Groupe de mise au point (focus interne)',short:'Focus',role:'focus',F:200,els:[
+      {d:-5,w:0.55,shape:'bicx',n:'Convergente de focus'},{d:5,w:0.45,shape:'menisc+',n:'Ménisque convergent de focus'}]},
+    G1c:{name:'Groupe convergent fixe',short:'G1 fixe',role:'fixe',F:280,els:[
+      {d:-5,w:0.6,shape:'bicx',n:'Convergente fixe'},{d:5,w:0.4,shape:'menisc+',n:'Ménisque convergent fixe'}]},
+    G2:{name:'Variateur',short:'Variateur',role:'zoom',F:-50,els:[
+      {d:-6,w:-0.6,shape:'bicc',n:'Divergente du variateur'},{d:0,w:-0.55,shape:'bicc',n:'Divergente du variateur'},{d:6,w:0.15,shape:'menisc+',n:'Ménisque achromatisant'}]},
+    G3:{name:'Compensateur',short:'Compensateur',role:'comp',F:265,els:[
+      {d:-5,w:0.55,shape:'bicx',n:'Convergente du compensateur'},{d:5,w:0.45,shape:'bicx',n:'Convergente du compensateur'}]},
+    G4:{name:'Groupe arrière S35 (relais)',short:'Arrière S35',role:'rear',F:119,els:[
+      {d:-9,w:0.8,shape:'bicx',n:'Convergente du relais'},{d:0,w:-0.35,shape:'bicc',n:'Divergente de correction'},{d:9,w:0.55,shape:'bicx',n:'Convergente du relais'}]},
+    G4A:{name:'Groupe arrière IRO FF/VV (convergent)',short:'IRO A',role:'rear',F:51.36,els:[
+      {d:-5,w:0.55,shape:'bicx',n:'Convergente IRO'},{d:5,w:0.45,shape:'bicx',n:'Convergente IRO'}]},
+    G4B:{name:'Groupe arrière IRO FF/VV (expanseur)',short:'IRO B',role:'rear',F:-44.0,els:[
+      {d:-4,w:-0.7,shape:'bicc',n:'Divergente expanseur'},{d:4,w:-0.3,shape:'menisc-',n:'Ménisque divergent'}]},
+  };
+  // calibre chaque groupe : échelle des puissances pour obtenir F, décalage pour centrer les plans principaux
+  function groupTrace(els, y, u){ let z=els[0].z; for(const e of els){ y+=u*(e.z-z); z=e.z; u-=y*e.phi; } return {y,u,z}; }
+  for(const k in GROUPS){
+    const G=GROUPS[k]; const W=G.els.reduce((s,e)=>s+e.w,0);
+    let scale=1;
+    const mk=(sc)=>G.els.map(e=>({z:e.d,phi:e.w/W/G.F*sc}));
+    for(let i=0;i<60;i++){ const r=groupTrace(mk(scale),1,0); const f=-1/r.u; scale*=f/G.F; }
+    const els=mk(scale);
+    // matrice ABCD du groupe
+    const r1=groupTrace(els,1,0), r2=groupTrace(els,0,1);
+    const A=r1.y, C=r1.u, D=r2.u;
+    const H = els[0].z - (1-D)/C, Hp = els[els.length-1].z + (1-A)/C;
+    const mid=(H+Hp)/2;
+    G.calib=els.map((e,i)=>({o:e.z-mid, phi:e.phi, f:1/e.phi, shape:G.els[i].shape, n:G.els[i].n}));
+  }
+  const CFG = {
+    S35:{id:'S35',rears:[['G4',470]],label:'S35 · 24-290 mm T2.8',fmin:24,fmax:290,T:2.8,mod:1.22,ic:31.1,len:472},
+    FF:{id:'FF',rears:[['G4A',460],['G4B',480]],label:'FF/VV · 36-435 mm T4.2',fmin:36,fmax:435,T:4.2,mod:1.52,ic:46.3,len:523},
+  };
+  const IRIS_Z = 450, G1A_Z = 0, G1B_INF = 50, G1C_Z = 95, S_Z = 589, FLANGE = 52;
+  function elements(cfg, pos){
+    const order=[['G1a',G1A_Z],['G1b',pos.G1b],['G1c',G1C_Z],['G2',pos.G2],['G3',pos.G3]];
+    for(const [k,z] of cfg.rears) order.push([k,z+(pos.bf||0)]);
+    const out=[];
+    for(const [k,z] of order){ for(const e of GROUPS[k].calib) out.push({g:k,z:z+e.o,phi:e.phi,f:e.f,shape:e.shape,n:e.n}); }
+    return out;
+  }
+  function traceFwd(els, z0, y, u, pts){
+    let z=z0;
+    for(const e of els){ if(e.z<z0-1e-9) continue; y += u*(e.z-z); z=e.z; const uin=u; u = u - y*e.phi; if(pts) pts.push({z,y,uin,u,e}); }
+    return {z,y,u};
+  }
+  function imageOf(els, zObj){
+    let r;
+    if(!isFinite(zObj)) r = traceFwd(els, els[0].z-1, 1, 0);
+    else r = traceFwd(els, zObj, 0, 1);
+    return r.z - r.y/r.u;
+  }
+  function efl(els){ const r=traceFwd(els, els[0].z-1, 1, 0); return -1/r.u; }
+  function bisect(f, a, b, it=70){ let fa=f(a), fb=f(b); if(!(fa*fb<=0)) return NaN; for(let i=0;i<it;i++){ const m=(a+b)/2, fm=f(m); if(fa*fm<=0){b=m;fb=fm;} else {a=m;fa=fm;} } return (a+b)/2; }
+  const g1els = (cfg,zb)=>elements(cfg,{G1b:zb,G2:1e5,G3:2e5}).filter(e=>e.g==='G1a'||e.g==='G1b'||e.g==='G1c');
+  const I1 = (cfg)=>imageOf(g1els(cfg,G1B_INF), -Infinity);
+
+  function solveZ3(cfg, z2, prev){
+    const f = z3 => imageOf(elements(cfg,{G1b:G1B_INF,G2:z2,G3:z3}), -Infinity) - S_Z;
+    const lo=z2+14, hi=IRIS_Z-6; const roots=[]; let a=lo, fa=f(a);
+    for(let i=1;i<=300;i++){ const b=lo+(hi-lo)*i/300, fb=f(b); if(isFinite(fa)&&isFinite(fb)&&fa*fb<=0&&Math.abs(fa-fb)<200){ const r=bisect(f,a,b); if(isFinite(r)) roots.push(r);} a=b; fa=fb; }
+    if(!roots.length) return NaN;
+    if(prev==null) return roots[roots.length-1];
+    roots.sort((p,q)=>Math.abs(p-prev)-Math.abs(q-prev)); return roots[0];
+  }
+  // table des cames : z2 -> z3 -> EFL
+  function buildCam(cfg){
+    const tab=[]; let prev=null;
+    for(let z2=100; z2<=360; z2+=0.5){
+      const z3=solveZ3(cfg,z2,prev); if(!isFinite(z3)){ if(tab.length) break; else continue; }
+      prev=z3; tab.push({z2,z3,f:efl(elements(cfg,{G1b:G1B_INF,G2:z2,G3:z3}))});
+    }
+    cfg.camAll=tab; return tab;
+  }
+  return {GROUPS, CFG, IRIS_Z, G1A_Z, G1B_INF, G1C_Z, S_Z, FLANGE, elements, traceFwd, imageOf, efl, bisect, I1, g1els, solveZ3, buildCam};
+})();
+</script>
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const fmt = (n, d=1) => Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn = (n, d=1) => (n>0.00001?'+':n<-0.00001?'−':'±')+fmt(Math.abs(n),d);
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const O = OPTICS;
+const DEG = 180/Math.PI;
+
+/* ------------------------------------------------------------------ */
+/*  Formats capteur (Sony VENICE) et configurations de l'optique       */
+/* ------------------------------------------------------------------ */
+const FORMATS = {
+  FF:{id:'FF',name:'24×36 (plein capteur)',w:35.9,h:19.0,coc:0.030,mode:'8.6K 17:9 plein capteur · 35,9 × 19,0 mm',tag:'8.6K FF'},
+  S35:{id:'S35',name:'Super 35',w:24.1,h:12.7,coc:0.025,mode:'5.8K 17:9 S35 · 24,1 × 12,7 mm',tag:'5.8K S35'},
+  B4:{id:'B4',name:'2/3″ vidéo',w:9.59,h:5.39,coc:0.011,mode:'2/3″ · 9,6 × 5,4 mm (recadrage simulé)',tag:'2/3″'},
+};
+const THIRDS = [2.8,3.2,3.5,4,4.5,5,5.6,6.3,7.1,8,9,10,11,13,14,16,18,20,22];
+const ZOOM_TICKS = {S35:[24,28,35,40,50,60,75,100,120,150,200,250,290], FF:[36,40,50,60,75,100,135,150,200,250,300,350,435]};
+const FOCUS_TICKS = [1.22,1.35,1.5,1.75,2,2.5,3,4,5,7,10,15,25,Infinity];
+const SUBJ = {X:0}, TREE = {X:-1.9, back:10}, SPOT = {X:0.8, Y:2.05, back:20};
+const CAM_H = 1.6;
+
+const S = {
+  fmt:'S35', lens:'S35', lux:25000, zp:Math.log(75/24)/Math.log(290/24), D:3.5, iris:0, bf:0, dist:3.5,
+  iso:800, nd:8, look:'scinetone', vex:1, step:Infinity, loupe:true, peak:false, grid:false,
+  tree:true, spot:true, flare:true, rays:{subj:true,tree:true,spot:true,field:false},
+};
+const FMT = () => FORMATS[S.fmt];
+const CFG = () => O.CFG[S.lens];
+const tList = cfg => [cfg.T].concat(THIRDS.filter(t=>t>cfg.T*1.04));
+const Tof = () => { const l=tList(CFG()); return l[clamp(S.iris,0,l.length-1)]; };
+const focalOf = (zp, cfg=CFG()) => cfg.fmin*Math.pow(cfg.fmax/cfg.fmin, zp);
+
+/* ------------------------------------------------------------------ */
+/*  Préparation d'une configuration : cames, iris, diamètres utiles    */
+/* ------------------------------------------------------------------ */
+function solveZ3Near(cfg, z2, prev){
+  const f = z3 => O.imageOf(O.elements(cfg,{G1b:O.G1B_INF,G2:z2,G3:z3}),-Infinity) - O.S_Z;
+  for(let w=0.5; w<=16; w*=2){ const r=O.bisect(f,prev-w,prev+w,48); if(isFinite(r)) return r; }
+  return O.solveZ3(cfg,z2,prev);
+}
+function solveFocus(cfg, D){
+  if(!isFinite(D) || D>1e5) return O.G1B_INF;
+  const zo = O.S_Z - Math.max(D,cfg.mod*0.999)*1000;
+  const f = zb => O.imageOf(O.g1els(cfg,zb), zo) - cfg.I1v;
+  const r = O.bisect(f, O.G1B_INF-15, O.G1B_INF+40, 50);
+  return isFinite(r) ? r : O.G1B_INF;
+}
+function prepare(cfg){
+  if(cfg.tab) return cfg;
+  cfg.I1v = O.I1(cfg);
+  const all = O.buildCam(cfg);
+  const atZ2 = (z2,prev) => { const z3=solveZ3Near(cfg,z2,prev); return {z2,z3,f:O.efl(O.elements(cfg,{G1b:O.G1B_INF,G2:z2,G3:z3}))}; };
+  const findF = F => { const i=all.findIndex(c=>c.f>=F); const a=all[Math.max(0,i-1)], b=all[i];
+    let lo=a.z2, hi=b.z2, prev=a.z3; for(let k=0;k<36;k++){ const m=(lo+hi)/2, r=atZ2(m,prev); if(r.f<F){lo=m;prev=r.z3;} else hi=m; } return (lo+hi)/2; };
+  const zw=findF(cfg.fmin), zt=findF(cfg.fmax);
+  const tab=[]; let prev=all.find(c=>c.z2>=zw).z3; const N=700;
+  for(let i=0;i<=N;i++){ const z2=zw+(zt-zw)*i/N; const r=atZ2(z2,prev); prev=r.z3; tab.push(r); }
+  cfg.tab=tab; cfg.lf=tab.map(t=>Math.log(t.f));
+  // diamètre de l'iris à pleine ouverture (constant sur toute la plage : pas de rampe)
+  const els0=O.elements(cfg,{G1b:O.G1B_INF,G2:tab[0].z2,G3:tab[0].z3});
+  cfg.kIris = heightAt(els0, els0[0].z-1, 1, 0, O.IRIS_Z);
+  cfg.rIris = tab[0].f/cfg.T/2*cfg.kIris;
+  // diamètres utiles des lentilles (balayage zoom × point)
+  const n=els0.length, sd=new Array(n).fill(0);
+  for(const D of [Infinity, cfg.mod]){
+    const zb=solveFocus(cfg,D);
+    for(let i=0;i<=N;i+=35){
+      const c=tab[i], els=O.elements(cfg,{G1b:zb,G2:c.z2,G3:c.z3});
+      const z0=els[0].z-1, ep=c.f/cfg.T/2;
+      const a=heightAt(els,z0,1,0,O.IRIS_Z), b=heightAt(els,z0,0,1,O.IRIS_Z);
+      const ys=traceTo(els,z0,-b/a,1,O.S_Z).y; const sc=(cfg.ic/2*0.8)/Math.abs(ys);
+      const yc=-b/a*sc, uc=sc;
+      for(const [y0,u0] of [[ep,0],[yc+ep,uc],[yc-ep,uc]]){ const p=[]; O.traceFwd(els,z0,y0,u0,p); p.forEach((q,j)=>{ sd[j]=Math.max(sd[j],Math.abs(q.y)); }); }
+    }
+  }
+  cfg.sd = sd.map((v,i)=>clamp(v*1.05+1.5, 8, i<2?81:76));
+  return cfg;
+}
+function heightAt(els, z0, y, u, zt){ let z=z0; for(const e of els){ if(e.z<z0-1e-9) continue; if(e.z>=zt) break; y+=u*(e.z-z); z=e.z; u-=y*e.phi; } return y+u*(zt-z); }
+function traceTo(els, z0, y, u, zt){ const r=O.traceFwd(els,z0,y,u); return {y:r.y+r.u*(zt-r.z), u:r.u}; }
+function camAt(cfg, f){
+  const lf=Math.log(f), L=cfg.lf; let lo=0, hi=L.length-1;
+  if(lf<=L[0]) return cfg.tab[0]; if(lf>=L[hi]) return cfg.tab[hi];
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(L[m]<lf) lo=m; else hi=m; }
+  const t=(lf-L[lo])/(L[hi]-L[lo]), a=cfg.tab[lo], b=cfg.tab[hi];
+  return {z2:a.z2+(b.z2-a.z2)*t, z3:a.z3+(b.z3-a.z3)*t, f};
+}
+
+/* ------------------------------------------------------------------ */
+/*  État animé : la bague tourne, les groupes suivent                  */
+/* ------------------------------------------------------------------ */
+const cur = {zp:S.zp, invD:1/S.D, bf:0, T:2.8, dist:S.dist};
+let dirty = true;
+function tgt(){ return {zp:S.zp, invD:isFinite(S.D)?1/S.D:0, bf:S.bf, T:Tof(), dist:S.dist}; }
+function snap(){ Object.assign(cur, tgt()); dirty=true; }
+
+function compute(){
+  const cfg=CFG(), F=FMT();
+  const f=focalOf(cur.zp,cfg), c=camAt(cfg,f);
+  const D=cur.invD<1e-5?Infinity:1/cur.invD;
+  const z1b=solveFocus(cfg,D);
+  const els=O.elements(cfg,{G1b:z1b,G2:c.z2,G3:c.z3,bf:cur.bf});
+  const Q={cfg,F,f,c,D,z1b,els,T:cur.T,bf:cur.bf,dist:cur.dist,rStop:cfg.rIris*cfg.T/cur.T};
+  Q.efl=O.efl(els);
+  Q.zObj = Z => O.S_Z - Z*1000;
+  Q.hI = zo => heightAt(els, zo, 0, 1, O.IRIS_Z);
+  Q.blur = Z => { const zo=Q.zObj(Z); const u0=Q.rStop/Q.hI(zo); return 2*Math.abs(traceTo(els,zo,0,u0,O.S_Z).y); };
+  Q.delta = Z => O.imageOf(els, Q.zObj(Z)) - O.S_Z;
+  Q.k = Z => { const zo=Q.zObj(Z); const a=heightAt(els,zo,1,0,O.IRIS_Z), b=Q.hI(zo); return traceTo(els,zo,1,-a/b,O.S_Z).y; };
+  Q.objs = [
+    {id:'subj',name:'Personnage',Z:cur.dist,col:'#efb43f',on:S.rays.subj},
+    {id:'tree',name:'Arbre',Z:cur.dist+TREE.back,col:'#7fbf6a',on:S.rays.tree&&S.tree},
+    {id:'spot',name:'Projecteur',Z:cur.dist+SPOT.back,col:'#8fc3ea',on:S.rays.spot&&S.spot},
+  ];
+  for(const o of Q.objs){ o.blur=Q.blur(o.Z); o.delta=Q.delta(o.Z); }
+  // projection sténopé équivalente (pupille d'entrée) ajustée sur deux profondeurs
+  const ppm = Z => Math.abs(Q.k(Z))*1000/F.w*MW;
+  const Z1=cur.dist, Z2=cur.dist+20, p1=ppm(Z1), p2=ppm(Z2);
+  Q.e = (p1*Z1-p2*Z2)/(p1-p2); Q.A = p1*(Z1-Q.e);
+  if(!isFinite(Q.e)||!isFinite(Q.A)){ Q.e=0; Q.A=p1*Z1; }
+  Q.ppm = Z => Q.A/Math.max(0.05,Z-Q.e);
+  Q.feff = isFinite(D)&&D<1e4 ? Math.abs(Q.k(D))*D*1000 : Q.efl;
+  Q.bpx = Z => Q.blur(Z)/F.w*MW;
+  return Q;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Schéma optique                                                     */
+/* ------------------------------------------------------------------ */
+const ocv=$('optics'), octx=ocv.getContext('2d');
+let OW=0, OH=0, DPR=1;
+function sizeOptics(){
+  const r=ocv.getBoundingClientRect(); DPR=Math.min(2,window.devicePixelRatio||1);
+  OW=Math.max(200,r.width); OH=Math.max(150,r.height);
+  ocv.width=Math.round(OW*DPR); ocv.height=Math.round(OH*DPR); dirty=true;
+}
+const GCOL = {G1a:'#c9c3b6',G1b:'#efb43f',G1c:'#c9c3b6',G2:'#f08a5a',G3:'#8fc3ea',G4:'#c9c3b6',G4A:'#c9c3b6',G4B:'#c9c3b6'};
+let moveInfo = null; // {groups:{g:{from,to}}, t}
+
+function rayFamily(Q, o){
+  const zo=Q.zObj(o.Z), hI=Q.hI(zo), rays=[];
+  for(const fr of [1,0.5,-0.5,-1]){ const u0=fr*Q.rStop/hI; const pts=[]; const r=O.traceFwd(Q.els,zo,0,u0,pts); rays.push({fr,u0,zo,pts,yS:r.y+r.u*(O.S_Z-r.z),uS:r.u}); }
+  return rays;
+}
+function fieldFamily(Q){
+  const Z=Q.dist, zo=Q.zObj(Z); const a=heightAt(Q.els,zo,1,0,O.IRIS_Z), b=Q.hI(zo);
+  const uc=-a/b; const ys=traceTo(Q.els,zo,1,uc,O.S_Z).y; const Y=(Q.F.w/2)/Math.abs(ys);
+  const rays=[]; for(const fr of [1,0,-1]){ const u0=uc*Y+fr*Q.rStop/b; const pts=[]; const r=O.traceFwd(Q.els,zo,Y,u0,pts); rays.push({fr,u0,y0:Y,zo,pts,yS:r.y+r.u*(O.S_Z-r.z),uS:r.u}); }
+  return rays;
+}
+
+function lensPath(c, x, yc, h, t, shape){
+  const top=yc-h, bot=yc+h, e=1.2;
+  c.beginPath();
+  if(shape==='bicx'){ c.moveTo(x-e,top); c.quadraticCurveTo(x-t*1.1,yc,x-e,bot); c.lineTo(x+e,bot); c.quadraticCurveTo(x+t*1.1,yc,x+e,top); }
+  else if(shape==='bicc'){ const te=t*0.55; c.moveTo(x-te,top); c.quadraticCurveTo(x+te-1.6,yc,x-te,bot); c.lineTo(x+te,bot); c.quadraticCurveTo(x-te+1.6,yc,x+te,top); }
+  else if(shape==='menisc+'){ c.moveTo(x-e,top); c.quadraticCurveTo(x-t*1.3,yc,x-e,bot); c.lineTo(x+e,bot); c.quadraticCurveTo(x-t*0.25,yc,x+e,top); }
+  else { const te=t*0.5; c.moveTo(x-te,top); c.quadraticCurveTo(x-te-t*0.5,yc,x-te,bot); c.lineTo(x+te,bot); c.quadraticCurveTo(x-t*0.9,yc,x+te,top); }
+  c.closePath();
+}
+
+function drawOptics(Q){
+  const c=octx; c.setTransform(DPR,0,0,DPR,0,0); c.clearRect(0,0,OW,OH);
+  const cfg=Q.cfg, els=Q.els, N=els.length;
+  const zMin=-40, zMax=O.S_Z+70;
+  const sx=(OW-24)/(zMax-zMin);
+  const topPad=46, botPad=20; const avail=OH-topPad-botPad;
+  const sy=Math.min(sx, avail/2/90)*S.vex;
+  const midY=topPad+avail/2;
+  const X=z=>12+(z-zMin)*sx, Y=y=>midY-y*sy;
+  const clipTop=topPad-6, clipBot=OH-4;
+  const moving = new Set(); if(moveInfo && performance.now()-moveInfo.t<3500) for(const g in moveInfo.groups) moving.add(g);
+  const animG = new Set(); if(Math.abs(cur.zp-S.zp)>1e-4){animG.add('G2');animG.add('G3');} if(Math.abs(cur.invD-(isFinite(S.D)?1/S.D:0))>1e-5) animG.add('G1b'); if(Math.abs(cur.bf-S.bf)>1e-4) cfg.rears.forEach(r=>animG.add(r[0]));
+
+  c.save(); c.beginPath(); c.rect(0,clipTop,OW,clipBot-clipTop); c.clip();
+  // fût de l'objectif
+  const prof=[[-6,92],[70,92],[118,72],[300,66],[O.IRIS_Z-30,60],[O.S_Z-52,52]];
+  c.fillStyle='#141619'; c.strokeStyle='#34383c'; c.lineWidth=1;
+  for(const s of [1,-1]){ c.beginPath(); c.moveTo(X(prof[0][0]),Y(0)); prof.forEach(([z,r])=>c.lineTo(X(z),Y(s*r))); c.lineTo(X(prof[prof.length-1][0]),Y(0)); c.closePath(); c.fill(); }
+  c.beginPath(); prof.forEach(([z,r],i)=>i?c.lineTo(X(z),Y(r)):c.moveTo(X(z),Y(r))); c.stroke();
+  c.beginPath(); prof.forEach(([z,r],i)=>i?c.lineTo(X(z),Y(-r)):c.moveTo(X(z),Y(-r))); c.stroke();
+  // monture PL + boîtier VENICE
+  const mz=O.S_Z-O.FLANGE;
+  c.fillStyle='#202326'; c.fillRect(X(mz)-3,Y(64),6,Y(-64)-Y(64));
+  c.fillStyle='#1a1c1f'; c.strokeStyle='#34383c'; c.fillRect(X(mz)+3,Y(78),X(zMax)-X(mz),Y(-78)-Y(78)); c.strokeRect(X(mz)+3,Y(78),X(zMax)-X(mz)+10,Y(-78)-Y(78));
+  c.restore();
+  // axe optique
+  c.strokeStyle='rgba(155,157,152,.35)'; c.setLineDash([6,5]); c.beginPath(); c.moveTo(4,Y(0)); c.lineTo(OW-4,Y(0)); c.stroke(); c.setLineDash([]);
+
+  // rayons
+  const stepMax=N+1, step=Math.min(S.step,stepMax);
+  const fams=[];
+  for(const o of Q.objs) if(o.on) fams.push({o,col:o.col,rays:rayFamily(Q,o)});
+  if(S.rays.field) fams.push({o:{name:'Bord de cadre'},col:'#d9d3c6',rays:fieldFamily(Q),field:true});
+  const zL=zMin+2;
+  c.save(); c.beginPath(); c.rect(0,clipTop,X(O.S_Z)+1+(step>=stepMax?40:0),clipBot-clipTop); c.clip();
+  c.lineJoin='round';
+  for(const fam of fams){
+    c.strokeStyle=fam.col; c.globalAlpha=fam.field?0.75:0.85; c.lineWidth=fam.field?1:1.25;
+    for(const r of fam.rays){
+      const y0=(r.y0||0)+r.u0*(zL-r.zo);
+      c.beginPath(); c.moveTo(X(zL),Y(y0));
+      const lim = step>=stepMax ? N : step;
+      for(let i=0;i<lim;i++){ const p=r.pts[i]; c.lineTo(X(p.z),Y(p.y)); }
+      if(step>=stepMax){ c.lineTo(X(O.S_Z),Y(r.yS)); }
+      else if(step===0){ const p=r.pts[0]; c.lineTo(X(p.z),Y(p.y)); }
+      else { const p=r.pts[lim-1]; const dz=14; c.lineTo(X(p.z+dz),Y(p.y+p.u*dz)); }
+      c.stroke();
+      if(step>=stepMax){ c.globalAlpha=0.25; c.beginPath(); c.moveTo(X(O.S_Z),Y(r.yS)); c.lineTo(X(O.S_Z+30),Y(r.yS+r.uS*30)); c.stroke(); c.globalAlpha=fam.field?0.75:0.85; }
+    }
+  }
+  c.restore(); c.globalAlpha=1;
+
+  // lentilles
+  for(let i=0;i<N;i++){
+    const e=els[i], h=cfg.sd[i]*sy, x=X(e.z), t=clamp(cfg.sd[i]*0.16,3,13)*sx;
+    lensPath(c,x,Y(0),Math.min(h,midY-clipTop+40),t,e.shape);
+    const hl = step<stepMax && i===step-1;
+    c.fillStyle = hl ? 'rgba(239,180,63,.38)' : 'rgba(143,195,234,.13)';
+    c.strokeStyle = hl ? '#efb43f' : (animG.has(e.g)||moving.has(e.g)) ? GCOL[e.g] : 'rgba(176,212,236,.6)';
+    c.lineWidth = hl?1.6:1.1; c.fill(); c.stroke();
+  }
+  // iris
+  const xi=X(O.IRIS_Z), rh=58;
+  c.fillStyle='#55595d'; c.strokeStyle='#c9c3b6'; c.lineWidth=1.2;
+  for(const s of [1,-1]){ const a=Y(s*Q.rStop), b=Y(s*rh); c.fillRect(xi-2.5,Math.min(a,b),5,Math.abs(b-a)); c.beginPath(); c.moveTo(xi-5,a); c.lineTo(xi+5,a); c.stroke(); }
+  // capteur
+  const xs=X(O.S_Z), hw=Q.F.w/2, ic=cfg.ic/2;
+  c.fillStyle='#d9d3c6'; c.fillRect(xs-1.5,Y(hw),3,Y(-hw)-Y(hw));
+  c.strokeStyle='rgba(239,180,63,.6)'; c.setLineDash([2,3]); c.beginPath(); c.moveTo(xs-8,Y(ic)); c.lineTo(xs+8,Y(ic)); c.moveTo(xs-8,Y(-ic)); c.lineTo(xs+8,Y(-ic)); c.stroke(); c.setLineDash([]);
+
+  // étiquettes des groupes
+  c.font='600 11px "Barlow Condensed","Arial Narrow",sans-serif'; c.textAlign='center'; c.textBaseline='alphabetic';
+  const groups=[]; for(const e of els){ let g=groups.find(q=>q.g===e.g); if(!g){g={g:e.g,zs:[],idx:[]};groups.push(g);} g.zs.push(e.z); }
+  const labels=[]; groups.forEach(g=>{ const z=(Math.min(...g.zs)+Math.max(...g.zs))/2; labels.push({x:X(z),txt:O.GROUPS[g.g].short.toUpperCase(),g:g.g}); });
+  labels.push({x:xi,txt:'IRIS',g:'iris'}); labels.push({x:xs,txt:'CAPTEUR '+Q.F.id.replace('B4','2/3″'),g:'S'}); labels.push({x:X(mz),txt:'PL',g:'PL'});
+  labels.sort((a,b)=>a.x-b.x); const lastX=[-1e9,-1e9,-1e9];
+  for(const L of labels){ const w=c.measureText(L.txt).width+8; let row=lastX.findIndex(v=>L.x-w/2>v); if(row<0) row=lastX.indexOf(Math.min(...lastX)); lastX[row]=L.x+w/2;
+    const yy=13+row*12; const active=animG.has(L.g)||moving.has(L.g);
+    c.fillStyle=active?GCOL[L.g]||'#efb43f':'#9b9d98'; c.fillText(L.txt,L.x,yy);
+    c.strokeStyle='rgba(155,157,152,.3)'; c.beginPath(); c.moveTo(L.x,yy+3); c.lineTo(L.x,topPad-2); c.stroke(); }
+  c.textAlign='left';
+
+  // flèches de déplacement
+  if(moveInfo && performance.now()-moveInfo.t<3500){
+    const alpha=1-Math.max(0,(performance.now()-moveInfo.t-2500)/1000);
+    c.globalAlpha=alpha; c.font='500 10.5px "IBM Plex Mono",monospace';
+    let k=0;
+    for(const g in moveInfo.groups){ const m=moveInfo.groups[g]; if(Math.abs(m.to-m.from)<0.05) continue;
+      const yy=OH-6-(k%2)*12; const x1=X(m.from), x2=X(m.to); c.strokeStyle=c.fillStyle=GCOL[g]||'#efb43f'; c.lineWidth=1.5;
+      c.beginPath(); c.moveTo(x1,yy-4); c.lineTo(x2,yy-4); c.stroke(); const d=Math.sign(x2-x1)||1; c.beginPath(); c.moveTo(x2,yy-4); c.lineTo(x2-d*5,yy-7); c.lineTo(x2-d*5,yy-1); c.fill();
+      c.fillText(sgn(m.to-m.from,1)+' mm',Math.max(x1,x2)+6,yy); k++; }
+    c.globalAlpha=1;
+  }
+
+  // loupe capteur
+  if(S.loupe && step>=stepMax){
+    const lw=Math.min(250,OW*0.3), lh=Math.min(118,avail*0.48); const lx=OW-lw-8, ly=OH-lh-botPad+8;
+    const vis=fams.filter(f=>!f.field);
+    let R=0.15; vis.forEach(f=>{ R=Math.max(R,Math.abs(f.o.delta)*1.35); }); R=Math.min(R,40);
+    const dof=Q.T*Q.F.coc; R=Math.max(R,dof*2.2);
+    let V=0.008; vis.forEach(f=>{ V=Math.max(V,Math.min(f.o.blur*0.7, Math.abs(f.rays[0].uS)*R*1.05)); });
+    c.fillStyle='rgba(10,10,11,.92)'; c.strokeStyle='#34383c'; c.fillRect(lx,ly,lw,lh); c.strokeRect(lx+.5,ly+.5,lw-1,lh-1);
+    const LX=z=>lx+lw/2+(z-O.S_Z)/R*(lw/2-6), LY=y=>ly+lh/2+8-y/V*(lh/2-14);
+    c.save(); c.beginPath(); c.rect(lx+1,ly+15,lw-2,lh-16); c.clip();
+    c.fillStyle='rgba(239,180,63,.12)'; c.fillRect(LX(O.S_Z-dof),ly,LX(O.S_Z+dof)-LX(O.S_Z-dof),lh);
+    c.strokeStyle='rgba(155,157,152,.3)'; c.beginPath(); c.moveTo(lx,LY(0)); c.lineTo(lx+lw,LY(0)); c.stroke();
+    for(const f of vis){ c.strokeStyle=f.col; c.lineWidth=1.2; for(const r of f.rays){ c.beginPath(); c.moveTo(LX(O.S_Z-R),LY(r.yS-r.uS*R)); c.lineTo(LX(O.S_Z+R),LY(r.yS+r.uS*R)); c.stroke(); }
+      const zi=O.S_Z+f.o.delta; if(Math.abs(f.o.delta)<R){ c.fillStyle=f.col; c.beginPath(); c.arc(LX(zi),LY(0),2.6,0,7); c.fill(); } }
+    c.fillStyle='#d9d3c6'; c.fillRect(LX(O.S_Z)-1,ly,2,lh);
+    c.restore();
+    c.fillStyle='#9b9d98'; c.font='500 10px "IBM Plex Mono",monospace';
+    c.fillText('LOUPE CAPTEUR  ±'+fmt(R,R<1?2:1)+' mm  /  ±'+fmt(V*1000,0)+' µm',lx+6,ly+11);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Fiche pas à pas                                                    */
+/* ------------------------------------------------------------------ */
+function stepCard(Q){
+  const card=$('stepcard'), N=Q.els.length;
+  $('rngStep').max=N+1;
+  if(S.step>N){ card.hidden=true; $('outStep').textContent='tout'; return; }
+  card.hidden=false; const s=S.step; $('outStep').textContent=s+' / '+N;
+  const fams=Q.objs.filter(o=>o.on).map(o=>({o,r:rayFamily(Q,o)[0]}));
+  let html;
+  if(s===0){
+    html='<h4>Étape 0 · Les rayons arrivent</h4><div>Chaque point de la scène envoie un cône de lumière vers la frontale. Vu de l’objectif, l’arbre et le projecteur sont si loin que leurs rayons sont presque parallèles.</div><div class="m">';
+    for(const f of fams) html+=`<div><span style="color:${f.o.col}">●</span> ${f.o.name} (${fmt(f.o.Z,1)} m) : angle <b>${fmt(Math.atan(f.r.u0)*DEG,3)}°</b></div>`;
+    html+='</div>';
+  } else {
+    const e=Q.els[s-1], G=O.GROUPS[e.g], conv=e.phi>0;
+    html=`<h4>Étape ${s}/${N} · ${G.name}</h4><div>${e.n} · f = <b>${fmt(e.f,0)} mm</b> · ${conv?'convergente : elle rabat les rayons vers l’axe':'divergente : elle écarte les rayons de l’axe'}${G.role==='zoom'?' · <i>bouge avec le zoom</i>':G.role==='comp'?' · <i>bouge avec le zoom (compense)</i>':G.role==='focus'?' · <i>bouge avec la mise au point</i>':G.role==='rear'?' · <i>se règle avec le tirage</i>':' · <i>fixe</i>'}.</div><div class="m">`;
+    for(const f of fams){ const p=f.r.pts[s-1]; const a1=Math.atan(p.uin)*DEG, a2=Math.atan(p.u)*DEG;
+      html+=`<div><span style="color:${f.o.col}">●</span> ${f.o.name} : h = <b>${fmt(p.y,1)} mm</b> · <b>${fmt(a1,2)}° → ${fmt(a2,2)}°</b> (${sgn(a2-a1,2)}°)</div>`; }
+    if(s>1 && Q.els[s-2].z<O.IRIS_Z && e.z>O.IRIS_Z) html+=`<div>Le faisceau vient de passer l’iris : Ø ${fmt(Q.rStop*2,1)} mm.</div>`;
+    html+='</div>';
+  }
+  card.innerHTML=html;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Moniteur VENICE : rendu de la scène                                */
+/* ------------------------------------------------------------------ */
+const MW=1024, MH=576, PAD=120, LW=MW+2*PAD, LH=MH+2*PAD;
+const mon=$('mon'), mctx=mon.getContext('2d',{willReadFrequently:true});
+const mk=(w,h)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
+const layA=mk(LW,LH), comp=mk(LW,LH), fg=mk(LW,LH), tmp=mk(MW,MH), gsharp=mk(LW,LH);
+const gAcc=mk(LW,LH), gTmp=mk(LW,LH), gPool=[]; const LEVEL_D=[0,2,4,8,16,32,64,128,256];
+const FILTER_OK=(()=>{ try{ const x=mk(4,4).getContext('2d'); x.filter='blur(2px)'; return x.filter==='blur(2px)'; }catch(e){ return false; } })();
+const small=mk(8,8);
+const sm1=mk(8,8), sm2=mk(8,8);
+function blurInto(dst, src, sigma){
+  if(sigma<0.3){ dst.drawImage(src,0,0); return; }
+  sigma=Math.min(sigma,110);
+  const f=sigma>3?Math.min(8,sigma/2.2):1;
+  const w=Math.max(2,Math.round(src.width/f)), h=Math.max(2,Math.round(src.height/f));
+  if(f===1 && FILTER_OK){ dst.filter='blur('+sigma.toFixed(2)+'px)'; dst.drawImage(src,0,0); dst.filter='none'; return; }
+  if(sm1.width!==w||sm1.height!==h){ sm1.width=sm2.width=w; sm1.height=sm2.height=h; }
+  const a=sm1.getContext('2d'), b=sm2.getContext('2d'); a.clearRect(0,0,w,h); b.clearRect(0,0,w,h);
+  a.imageSmoothingEnabled=true; a.imageSmoothingQuality='high'; a.drawImage(src,0,0,w,h);
+  if(FILTER_OK){ b.filter='blur('+(sigma/f).toFixed(2)+'px)'; b.drawImage(sm1,0,0); b.filter='none'; }
+  else { const w2=Math.max(1,w>>2), h2=Math.max(1,h>>2); b.drawImage(sm1,0,0,w2,h2); a.clearRect(0,0,w,h); a.drawImage(sm2,0,0,w2,h2,0,0,w,h); b.clearRect(0,0,w,h); b.drawImage(sm1,0,0); }
+  dst.imageSmoothingEnabled=true; dst.imageSmoothingQuality='high'; dst.drawImage(sm2,0,0,w,h,0,0,src.width,src.height);
+}
+const sig = d => d/2.6;
+function layer(target, fn, sigma){
+  const a=layA.getContext('2d'); a.setTransform(1,0,0,1,0,0); a.clearRect(0,0,LW,LH); a.setTransform(1,0,0,1,PAD,PAD);
+  fn(a); a.setTransform(1,0,0,1,0,0);
+  blurInto(target.getContext('2d'), layA, sigma);
+}
+function rng(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13; s^=s>>>17; s^=s<<5; return ((s>>>0)%100000)/100000; }; }
+const hash=(i,j)=>{ let h=(i*374761393+j*668265263)>>>0; h=(h^(h>>>13))*1274126177>>>0; return ((h^(h>>>16))>>>0)/4294967296; };
+
+// --- tonalité : linéarisation, exposition, courbe S-Cinetone / 709 / S-Log3
+const SRGB2LIN=new Float32Array(256); for(let i=0;i<256;i++){ const v=i/255; SRGB2LIN[i]=v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4); }
+const KSCENE=0.62, LUTN=4096, LUTMAX=64;
+const curves={
+  scinetone:x=>{ const ev=Math.log2(Math.max(x,1e-6)/0.18); return 0.012+0.968/(1+Math.exp(-0.74*(ev-0.6))); },
+  '709':x=>{ const ev=Math.log2(Math.max(x,1e-6)/0.18); return 1.0/(1+Math.exp(-0.98*(ev-0.32))); },
+  slog3:x=>{ const y = x>=0.01125 ? (420+Math.log10((x+0.01)/0.19)*261.5)/1023 : (x*(171.21029-95)/0.01125+95)/1023; return clamp(y,0,1); },
+};
+const LOOKSAT={scinetone:0.93,'709':1.04,slog3:0.72};
+let LUT=null, lutLook=null;
+function buildLUT(){ LUT=new Uint8ClampedArray(LUTN+1); const f=curves[S.look]; for(let i=0;i<=LUTN;i++){ const x=Math.pow(i/LUTN,2)*LUTMAX; LUT[i]=Math.round(f(x)*255); } lutLook=S.look; }
+const lutIdx = x => { if(x<=0) return 0; const t=Math.sqrt(x/LUTMAX); return t>=1?LUTN:(t*LUTN)|0; };
+const toneScalar = x => LUT[lutIdx(x)]/255;
+// posemètre incident : N² = E·S·t / C (C = 250), t = 1/48 s (obturateur 180° à 24 i/s)
+const SHUTTER=1/48;
+function exposureEV(Q){ const N2=S.lux*S.iso*SHUTTER/250/Math.pow(2,S.nd); return Math.log2(N2/(Q.T*Q.T)); }
+function exposureGain(Q){ return KSCENE*Math.pow(2,exposureEV(Q)); }
+let seedN=12345;
+function toneMap(data, G){
+  if(lutLook!==S.look) buildLUT();
+  const sat=LOOKSAT[S.look], warm=S.look==='scinetone';
+  const gr = S.iso>=3200?4:1.4;
+  const d=data.data; let s=seedN;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0) continue;
+    let r=SRGB2LIN[d[i]]*G, g=SRGB2LIN[d[i+1]]*G, b=SRGB2LIN[d[i+2]]*G;
+    if(warm){ r*=1.025; b*=0.97; }
+    let R=LUT[lutIdx(r)], Gc=LUT[lutIdx(g)], B=LUT[lutIdx(b)];
+    const Yl=0.2126*R+0.7152*Gc+0.0722*B;
+    s=(s*1103515245+12345)&0x7fffffff; const n=((s>>>8)&255)/255-0.5;
+    d[i]=Yl+(R-Yl)*sat+n*gr; d[i+1]=Yl+(Gc-Yl)*sat+n*gr; d[i+2]=Yl+(B-Yl)*sat+n*gr;
+  }
+  seedN=s;
+}
+
+// --- dessin des éléments de la scène (coordonnées écran, origine = coin du cadre)
+function P(Q,X,Y,Z){ const s=Q.ppm(Z); return [MW/2+X*s, MH/2-(Y-CAM_H)*s, s]; }
+function drawSky(c,Q){
+  const A=Q.A; const yAt=deg=>MH/2-Math.tan(deg/DEG)*A;
+  const top=-PAD, bot=MH/2+4;
+  const g=c.createLinearGradient(0,top,0,bot);
+  const stops=[[45,'#3f78c0'],[25,'#5b93d2'],[12,'#83afe0'],[5,'#a9c8e8'],[1.5,'#c8dbea'],[0,'#d9e3ea']];
+  for(const [deg,col] of stops){ const y=yAt(deg); g.addColorStop(clamp((y-top)/(bot-top),0,1),col); }
+  c.fillStyle=g; c.fillRect(-PAD,-PAD,LW,MH/2+PAD+6);
+}
+function drawHills(c,Q){
+  const Z=400, s=Q.ppm(Z), xr=(MW/2+PAD)/s;
+  c.fillStyle='#8ea3b4'; c.beginPath(); c.moveTo(-PAD,MH/2+3);
+  const step=Math.max(xr/220,0.15);
+  for(let X=-xr; X<=xr; X+=step){ const h=9+5*Math.sin(X/37)+3.5*Math.sin(X/13+1)+1.6*Math.sin(X/4.3+2)+0.7*Math.sin(X*1.7); c.lineTo(MW/2+X*s, MH/2-(h-CAM_H)*s); }
+  c.lineTo(MW+PAD,MH/2+3); c.closePath(); c.fill();
+}
+function drawGround(c,Q){
+  const A=Q.A, hz=MH/2;
+  const ZofY=y=>CAM_H*A/Math.max(0.3,y-hz)+Q.e;
+  const g=c.createLinearGradient(0,hz,0,MH+PAD);
+  const zc=[[300,'#a3ab9e'],[60,'#8a9a6a'],[20,'#6f8a45'],[6,'#5f7e38'],[1.5,'#557331']];
+  for(const [Z,col] of zc){ const y=hz+CAM_H*Q.ppm(Z); g.addColorStop(clamp((y-hz)/(MH+PAD-hz),0,1),col); }
+  c.fillStyle=g; c.fillRect(-PAD,hz,LW,MH+PAD-hz);
+  // flaque de lumière du projecteur
+  if(S.spot){ const Zs=Q.dist+SPOT.back; const [x,y,s]=P(Q,SPOT.X,0,Zs); const rx=4.5*s, ry=Math.max(2,rx*CAM_H/(Zs-Q.e)*1.1);
+    const rg=c.createRadialGradient(x,y,0,x,y,rx); rg.addColorStop(0,'rgba(255,236,200,.12)'); rg.addColorStop(1,'rgba(255,236,200,0)');
+    c.save(); c.translate(x,y); c.scale(1,ry/rx); c.translate(-x,-y); c.fillStyle=rg; c.beginPath(); c.arc(x,y,rx,0,7); c.fill(); c.restore(); }
+  // allée pavée
+  const Zn=Math.max(0.6,Q.e+0.4), Zf=Q.dist+60;
+  const pw=0.75; const [ax,ay]=P(Q,-pw,0,Zn), [bx]=P(Q,pw,0,Zn), [cx,cy]=P(Q,pw,0,Zf), [dx]=P(Q,-pw,0,Zf);
+  c.fillStyle='#c2b9a8'; c.beginPath(); c.moveTo(ax,ay); c.lineTo(bx,ay); c.lineTo(cx,cy); c.lineTo(dx,cy); c.closePath(); c.fill();
+  c.strokeStyle='rgba(80,72,62,.85)';
+  const Z0=Math.ceil((Zn-Q.dist)/0.6), Z1=Math.floor((Math.min(Zf,Q.dist+35)-Q.dist)/0.6);
+  for(let n=Z0;n<=Z1;n++){ const Z=Q.dist+n*0.6; const s=Q.ppm(Z); const [x1,y1]=P(Q,-pw,0,Z), [x2]=P(Q,pw,0,Z);
+    c.lineWidth=Math.max(0.4,0.014*s); c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y1); c.stroke();
+    const off=(n&1)?0.1875:0; c.beginPath(); for(let X=-pw+0.375-off; X<pw; X+=0.375){ if(X<=-pw+0.01) continue; const [xa,ya]=P(Q,X,0,Z), [xb,yb]=P(Q,X,0,Z+0.6); c.moveTo(xa,ya); c.lineTo(xb,yb); } c.stroke();
+    if(s>60){ const R=rng(n*7919+13); c.fillStyle='rgba(255,240,220,.07)'; for(let k=0;k<14;k++){ const [px,py]=P(Q,-pw+R()*2*pw,0,Z+R()*0.6); c.fillRect(px,py,Math.max(1,0.02*s),Math.max(1,0.006*s)); } }
+  }
+  // herbe : touffes posées sur une grille du monde
+  let count=0;
+  for(const [zA,zB,cs] of [[Zn,Q.dist+8,0.22],[Q.dist+8,Q.dist+22,0.45],[Q.dist+22,Q.dist+45,0.9]]){
+    const wz0=Math.floor((zA-Q.dist)/cs), wz1=Math.ceil((zB-Q.dist)/cs);
+    for(let j=wz0;j<=wz1 && count<9000;j++){ const Z=Q.dist+j*cs; if(Z<Zn) continue; const s=Q.ppm(Z); const xr=Math.min(16,(MW/2+PAD)/s);
+      const i0=Math.floor(-xr/cs), i1=Math.ceil(xr/cs);
+      for(let i=i0;i<=i1;i++){ const X=i*cs+hash(i,j)*cs; if(Math.abs(X)<pw+0.05) continue; const Zj=Z+hash(j,i)*cs; const s2=Q.ppm(Zj);
+        const [x,y]=P(Q,X,0,Zj); if(y<hz||y>MH+PAD) continue; const h=(0.05+hash(i+7,j)*0.07)*s2; const l=hash(i,j+3);
+        c.strokeStyle=l>0.6?'#8fae55':l>0.3?'#5f7f35':'#3d5424'; c.lineWidth=Math.max(0.6,0.008*s2);
+        c.beginPath(); c.moveTo(x,y); c.lineTo(x-0.3*h,y-h); c.moveTo(x+0.01*s2,y); c.lineTo(x+0.25*h,y-h*0.85); c.stroke(); count++; }
+    }
+  }
+}
+function drawTree(c,Q){
+  const Z=Q.dist+TREE.back; const [x0,y0,s]=P(Q,TREE.X,0,Z);
+  c.save(); c.translate(x0,y0); c.scale(s,-s);
+  c.fillStyle='rgba(20,35,15,.35)'; c.beginPath(); c.ellipse(0.9,0.02,2.4,0.09,0,0,7); c.fill();
+  c.fillStyle='#5a4535'; c.beginPath(); c.moveTo(-0.2,0); c.lineTo(0.2,0); c.lineTo(0.13,1.5); c.lineTo(0.11,2.7); c.lineTo(-0.11,2.7); c.lineTo(-0.14,1.5); c.closePath(); c.fill();
+  c.strokeStyle='rgba(15,10,8,.55)'; c.lineWidth=0.012; for(let k=0;k<9;k++){ c.beginPath(); const xx=-0.15+k*0.037; c.moveTo(xx,0.05); c.bezierCurveTo(xx+0.03,0.8,xx-0.03,1.6,xx*0.7,2.6); c.stroke(); }
+  c.strokeStyle='#33271f'; c.lineCap='round';
+  for(const [x1,y1,w] of [[-1.2,3.7,.09],[1.0,3.5,.08],[-0.3,4.6,.07],[0.5,4.9,.06],[-1.6,4.6,.05]]){ c.lineWidth=w; c.beginPath(); c.moveTo(0,2.4); c.quadraticCurveTo(x1*0.4,2.9+(y1-2.4)*0.3,x1,y1); c.stroke(); }
+  const R=rng(4242);
+  for(let k=0;k<820;k++){ const a=R()*6.283, rr=Math.sqrt(R()); const x=rr*2.35*Math.cos(a), y=4.35+rr*2.05*Math.sin(a); const sz=0.1+R()*0.26;
+    const lit=clamp(0.5+(y-4.3)*0.12-x*0.06+(R()-0.5)*0.35,0,1); const L=17+lit*30, H=88+R()*22;
+    c.fillStyle=`hsl(${H},${30+R()*16}%,${L}%)`; c.beginPath(); c.ellipse(x,y,sz,sz*(0.6+R()*0.4),R()*3,0,7); c.fill(); }
+  c.restore();
+}
+function drawStand(c,Q){
+  const Z=Q.dist+SPOT.back; const [x0,y0,s]=P(Q,SPOT.X,0,Z);
+  c.save(); c.translate(x0,y0); c.scale(s,-s); c.lineCap='round';
+  c.strokeStyle='#1d1e20'; c.lineWidth=0.035;
+  c.beginPath(); c.moveTo(-0.5,0); c.lineTo(0,0.85); c.lineTo(0.5,0); c.moveTo(0,0); c.lineTo(0,0.85); c.stroke();
+  c.lineWidth=0.045; c.beginPath(); c.moveTo(0,0.85); c.lineTo(0,1.85); c.stroke();
+  c.strokeStyle='#2a2b2e'; c.lineWidth=0.03; c.beginPath(); c.moveTo(-0.24,1.86); c.lineTo(-0.24,2.05); c.moveTo(0.24,1.86); c.lineTo(0.24,2.05); c.moveTo(-0.24,1.86); c.lineTo(0.24,1.86); c.stroke();
+  c.fillStyle='#202124'; c.fillRect(-0.21,1.83,0.42,0.42);
+  c.fillStyle='#16171a'; c.beginPath(); c.moveTo(-0.21,2.25); c.lineTo(-0.36,2.38); c.lineTo(0.36,2.38); c.lineTo(0.21,2.25); c.fill();
+  c.beginPath(); c.moveTo(-0.21,1.83); c.lineTo(-0.36,1.70); c.lineTo(0.36,1.70); c.lineTo(0.21,1.83); c.fill();
+  c.restore();
+}
+function ell(c,x,y,rx,ry,rot=0){ c.beginPath(); c.ellipse(x,y,rx,ry,rot,0,7); c.fill(); }
+function poly(c,p,fill=true){ c.beginPath(); p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y)); c.closePath(); if(fill) c.fill(); }
+function drawPerson(c,Q){
+  const Z=Q.dist; const [x0,y0,s]=P(Q,SUBJ.X,0,Z);
+  c.save(); c.translate(x0,y0); c.scale(s,-s); c.lineCap='round'; c.lineJoin='round';
+  c.fillStyle='rgba(20,30,15,.45)'; ell(c,0.18,0.012,0.5,0.03);
+  c.fillStyle='#18181a'; poly(c,[[-.18,0],[-.03,0],[-.03,.07],[-.16,.08]]); poly(c,[[.03,0],[.18,0],[.16,.08],[.03,.07]]);
+  c.fillStyle='#252d3c'; poly(c,[[-.165,.06],[-.025,.06],[-.012,.93],[-.19,.93]]); poly(c,[[.025,.06],[.165,.06],[.19,.93],[.012,.93]]);
+  c.strokeStyle='rgba(255,255,255,.05)'; c.lineWidth=.003; for(let y=.1;y<.92;y+=.012){ c.beginPath(); c.moveTo(-.18,y); c.lineTo(-.02,y+.004); c.moveTo(.02,y); c.lineTo(.18,y+.004); c.stroke(); }
+  // bras
+  c.fillStyle='#2e3e47'; poly(c,[[-.232,1.43],[-.19,1.36],[-.205,.9],[-.29,.9],[-.29,1.22]]); poly(c,[[.232,1.43],[.19,1.36],[.205,.9],[.29,.9],[.29,1.22]]);
+  c.fillStyle='#b57955'; ell(c,-.249,.855,.034,.052); ell(c,.249,.855,.034,.052);
+  // manteau
+  const coat=[[-.2,.84],[.2,.84],[.212,1.2],[.235,1.42],[.17,1.478],[.065,1.495],[-.065,1.495],[-.17,1.478],[-.235,1.42],[-.212,1.2]];
+  c.fillStyle='#33444e'; poly(c,coat);
+  c.save(); poly(c,coat,false); c.clip(); c.strokeStyle='rgba(255,255,255,.075)'; c.lineWidth=.0022;
+  for(let y=.84;y<1.5;y+=.007){ c.beginPath(); for(let x=-.25,k=0;x<.25;x+=.012,k++){ const d=(k&1)?.005:-.005; c.moveTo(x,y); c.lineTo(x+.012,y+d); } c.stroke(); }
+  c.restore();
+  c.fillStyle='#d8d1c3'; poly(c,[[-.065,1.495],[.065,1.495],[0,1.31]]);
+  c.strokeStyle='rgba(60,70,90,.35)'; c.lineWidth=.0015; for(let x=-.06;x<.06;x+=.006){ c.beginPath(); c.moveTo(x,1.49); c.lineTo(x*.2,1.33); c.stroke(); }
+  c.fillStyle='#27363f'; poly(c,[[-.065,1.495],[-.11,1.47],[-.035,1.22],[0,1.31]]); poly(c,[[.065,1.495],[.11,1.47],[.035,1.22],[0,1.31]]);
+  c.fillStyle='#151617'; for(const y of [1.17,1.05,.93]){ c.beginPath(); c.arc(0,y,.009,0,7); c.fill(); }
+  // cou et tête
+  c.fillStyle='#a86f4c'; c.fillRect(-.043,1.46,.086,.09);
+  c.fillStyle='#b27753'; ell(c,-.084,1.632,.014,.03); ell(c,.084,1.632,.014,.03);
+  const hg=c.createRadialGradient(-.025,1.67,.01,0,1.63,.13); hg.addColorStop(0,'#d7a07a'); hg.addColorStop(.7,'#bb825d'); hg.addColorStop(1,'#93603f');
+  c.fillStyle=hg; ell(c,0,1.632,.082,.108);
+  // cheveux
+  c.fillStyle='#271b15'; c.beginPath(); c.moveTo(-.086,1.62); c.bezierCurveTo(-.095,1.73,-.05,1.765,0,1.765); c.bezierCurveTo(.05,1.765,.095,1.73,.086,1.62);
+  c.bezierCurveTo(.08,1.66,.07,1.69,.05,1.70); c.bezierCurveTo(.02,1.712,-.02,1.712,-.05,1.70); c.bezierCurveTo(-.07,1.69,-.08,1.66,-.086,1.62); c.fill();
+  const R=rng(77); c.strokeStyle='rgba(120,90,70,.55)'; c.lineWidth=.0011;
+  for(let k=0;k<90;k++){ const a=-2.6+R()*2.2, x1=.085*Math.cos(a+3.14)*0.95, y1=1.70+R()*.05; c.beginPath(); c.moveTo(x1,y1); c.quadraticCurveTo(x1*.4,1.77,(R()-.5)*.08,1.715+R()*.04); c.stroke(); }
+  // sourcils, yeux
+  c.strokeStyle='#2a1c15'; c.lineWidth=.0055; c.beginPath(); c.moveTo(-.056,1.672); c.quadraticCurveTo(-.036,1.684,-.014,1.676); c.moveTo(.056,1.672); c.quadraticCurveTo(.036,1.684,.014,1.676); c.stroke();
+  for(const sx of [-1,1]){ const ex=sx*.033, ey=1.648;
+    c.fillStyle='#e6ddd3'; ell(c,ex,ey,.0145,.0062);
+    c.fillStyle='#4a3222'; c.beginPath(); c.arc(ex,ey,.0058,0,7); c.fill();
+    c.fillStyle='#0b0706'; c.beginPath(); c.arc(ex,ey,.0027,0,7); c.fill();
+    c.fillStyle='#ffffff'; c.beginPath(); c.arc(ex+.0021,ey+.002,.0012,0,7); c.fill();
+    c.strokeStyle='#2c1a12'; c.lineWidth=.0019; c.beginPath(); c.moveTo(ex-.0155,ey); c.quadraticCurveTo(ex,ey+.0125,ex+.0155,ey+.001); c.stroke();
+    c.lineWidth=.0006; for(let k=-4;k<=4;k++){ const lx=ex+k*.0031; c.beginPath(); c.moveTo(lx,ey+.0056); c.lineTo(lx+k*.0004,ey+.0078); c.stroke(); }
+    c.strokeStyle='rgba(110,60,40,.35)'; c.lineWidth=.0012; c.beginPath(); c.moveTo(ex-.012,ey-.0085); c.quadraticCurveTo(ex,ey-.012,ex+.012,ey-.008); c.stroke();
+  }
+  c.strokeStyle='rgba(120,70,45,.35)'; c.lineWidth=.004; c.beginPath(); c.moveTo(.006,1.64); c.quadraticCurveTo(.014,1.614,.013,1.602); c.stroke(); c.fillStyle='rgba(235,190,160,.18)'; ell(c,-.003,1.618,.005,.014);
+  c.fillStyle='rgba(80,40,28,.75)'; ell(c,-.009,1.597,.004,.002); ell(c,.009,1.597,.004,.002); c.fillStyle='rgba(190,100,80,.08)'; ell(c,-.045,1.605,.02,.014); ell(c,.045,1.605,.02,.014); c.fillStyle='rgba(60,30,20,.16)'; ell(c,.07,1.62,.016,.06);
+  c.fillStyle='#9d5a4d'; ell(c,0,1.571,.024,.0072); c.strokeStyle='#5c2f28'; c.lineWidth=.0014; c.beginPath(); c.moveTo(-.024,1.572); c.quadraticCurveTo(0,1.568,.024,1.572); c.stroke();
+  c.fillStyle='rgba(60,35,25,.18)'; ell(c,0,1.548,.03,.008);
+  // contre-jour chaud du projecteur sur la silhouette
+  c.strokeStyle='rgba(255,250,235,.28)'; c.lineWidth=.004;
+  c.beginPath(); c.moveTo(-.03,1.762); c.bezierCurveTo(-.06,1.758,-.093,1.72,-.087,1.64); c.stroke();
+  c.restore();
+}
+
+// --- sources lumineuses (après la courbe, en espace d'affichage)
+function ngon(c,x,y,r,n,rot){ c.beginPath(); for(let i=0;i<n;i++){ const a=rot+i*6.2832/n; const px=x+r*Math.cos(a), py=y+r*Math.sin(a); i?c.lineTo(px,py):c.moveTo(px,py); } c.closePath(); }
+function bokeh(c,Q,x,y,re,bd,I,tint,G){
+  const R=re+bd/2; const In=I*G*Math.pow(re/R,2);
+  const v=toneScalar(In), col=`rgb(${Math.round(255*toneScalar(In*tint[0]))},${Math.round(255*toneScalar(In*tint[1]))},${Math.round(255*toneScalar(In*tint[2]))})`;
+  c.save();
+  if(bd>3){
+    const rn=Math.hypot(x-MW/2,y-MH/2)/(MW/2); const cut=clamp(0.55*rn*rn*Math.sqrt(Q.cfg.T/Q.T),0,0.8);
+    if(cut>0.02){ const d=Math.hypot(x-MW/2,y-MH/2)||1; c.beginPath(); c.arc(x+(x-MW/2)/d*R*cut,y+(y-MH/2)/d*R*cut,R,0,7); c.clip(); }
+    const bladeR = Q.T>Q.cfg.T*1.1;
+    if(bladeR) ngon(c,x,y,R,9,-1.5708); else { c.beginPath(); c.arc(x,y,R,0,7); }
+    const g=c.createRadialGradient(x,y,0,x,y,R); g.addColorStop(0,col); g.addColorStop(0.82,col);
+    const ve=toneScalar(In*1.5); g.addColorStop(0.97,`rgba(${Math.round(255*ve)},${Math.round(250*ve)},${Math.round(235*ve)},1)`); g.addColorStop(1,col);
+    c.globalAlpha=clamp(v*1.8,0.15,1); c.fillStyle=g; c.fill();
+  } else { c.fillStyle=col; c.beginPath(); c.arc(x,y,Math.max(0.8,R),0,7); c.fill(); }
+  c.restore();
+  return {R,In};
+}
+const SPOT_I=420; // luminance de la face du projecteur HMI ≈ 400 × une carte blanche au soleil
+function drawEmitters(c,Q,G){
+  if(!S.spot) return null;
+  const Zs=Q.dist+SPOT.back, [x,y,s]=P(Q,SPOT.X,SPOT.Y,Zs); const re=Math.max(0.8,0.13*s), bd=Q.bpx(Zs);
+  const I=SPOT_I;
+  c.save(); c.globalCompositeOperation='lighter';
+  const hr=re*3+bd*0.9+30; const hv=clamp(toneScalar(I*G*0.003),0,1)*0.35;
+  const hg=c.createRadialGradient(x,y,0,x,y,hr); hg.addColorStop(0,`rgba(255,190,130,${hv})`); hg.addColorStop(1,'rgba(255,190,130,0)');
+  c.fillStyle=hg; c.beginPath(); c.arc(x,y,hr,0,7); c.fill(); c.restore();
+  const b=bokeh(c,Q,x,y,re,bd,I,[1,0.93,0.8],G);
+  return {x,y,re,bd,In:b.In};
+}
+function drawFlares(c,Q,G,src){
+  if(!S.flare||!S.spot||!src) return;
+  const {x,y}=src; const m=0.35*MW; const out=Math.max(0, x<0?-x:x>MW?x-MW:0, y<0?-y:y>MH?y-MH:0); if(out>m) return;
+  const vis=1-out/m, str=clamp(SPOT_I*G/250,0,1.4)*vis;
+  const cx=MW/2, cy=MH/2, open=Math.sqrt(Q.cfg.T/Q.T);
+  c.save(); c.globalCompositeOperation='lighter';
+  c.fillStyle=`rgba(255,170,105,${0.018*str})`; c.fillRect(0,0,MW,MH);
+  const ghosts=[[-0.3,.022,[255,175,95]],[-0.62,.06,[120,215,150]],[-0.95,.038,[205,130,255]],[-1.35,.11,[255,195,120]],[0.42,.028,[140,200,255]],[0.2,.014,[255,240,200]],[-1.7,.07,[110,170,255]]];
+  for(const [t,r,col] of ghosts){ const gx=cx+(x-cx)*t, gy=cy+(y-cy)*t, rr=r*MW*0.8*(0.5+0.5*open);
+    const g=c.createRadialGradient(gx,gy,0,gx,gy,rr); const a=0.045*str; g.addColorStop(0,`rgba(${col},${a*0.35})`); g.addColorStop(0.85,`rgba(${col},${a})`); g.addColorStop(1,`rgba(${col},0)`);
+    c.fillStyle=g; ngon(c,gx,gy,rr,9,-1.5708+t); c.fill(); }
+  c.restore();
+}
+function peaking(){
+  const im=mctx.getImageData(0,0,MW,MH), d=im.data; const L=new Float32Array(MW*MH);
+  for(let i=0,j=0;i<d.length;i+=4,j++) L[j]=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2];
+  for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ const j=y*MW+x;
+    const gx=L[j-MW+1]+2*L[j+1]+L[j+MW+1]-L[j-MW-1]-2*L[j-1]-L[j+MW-1];
+    const gy=L[j+MW-1]+2*L[j+MW]+L[j+MW+1]-L[j-MW-1]-2*L[j-MW]-L[j-MW+1];
+    if(gx*gx+gy*gy>9000){ const i=j*4; d[i]=255; d[i+1]=45; d[i+2]=35; } }
+  mctx.putImageData(im,0,0);
+}
+function renderMonitor(Q){
+  const G=exposureGain(Q);
+  // 1. arrière-plan
+  const cc=comp.getContext('2d'); cc.setTransform(1,0,0,1,0,0); cc.clearRect(0,0,LW,LH);
+  cc.setTransform(1,0,0,1,PAD,PAD); drawSky(cc,Q); cc.setTransform(1,0,0,1,0,0);
+  layer(comp,c=>drawHills(c,Q),sig(Q.bpx(400)));
+  // sol : pyramide de flous, une rangée = une distance
+  const gs=gsharp.getContext('2d'); gs.setTransform(1,0,0,1,0,0); gs.clearRect(0,0,LW,LH); gs.setTransform(1,0,0,1,PAD,PAD); drawGround(gs,Q); gs.setTransform(1,0,0,1,0,0);
+  const hz=MH/2, rows=[]; let maxD=0;
+  for(let y=-PAD; y<MH+PAD; y+=6){ const Z=y-hz<0.5?1e4:CAM_H*Q.A/(y-hz)+Q.e; const d=Q.bpx(Math.max(Z,0.2)); rows.push([y,d]); maxD=Math.max(maxD,d); }
+  const need=Math.min(LEVEL_D.length-1, Math.max(0,Math.ceil(Math.log2(Math.max(1,maxD))) ));
+  const ac=gAcc.getContext('2d'); ac.globalCompositeOperation='source-over'; ac.clearRect(0,0,LW,LH);
+  for(let l=0;l<=need;l++){
+    const f=l<2?1:Math.min(16,Math.pow(2,l-1)); const w=Math.round(LW/f), h=Math.round(LH/f);
+    const cv=gPool[l]||(gPool[l]=mk(w,h)); if(cv.width!==w){cv.width=w;cv.height=h;}
+    const tc=cv.getContext('2d'); tc.globalCompositeOperation='source-over'; tc.clearRect(0,0,w,h);
+    if(l===0) tc.drawImage(gsharp,0,0);
+    else { tc.imageSmoothingEnabled=true; tc.imageSmoothingQuality='high';
+      if(FILTER_OK){ tc.filter='blur('+(sig(LEVEL_D[l])/f).toFixed(2)+'px)'; tc.drawImage(gsharp,0,0,w,h); tc.filter='none'; }
+      else blurInto(tc,(()=>{ const t=gTmp.getContext('2d'); t.clearRect(0,0,LW,LH); t.drawImage(gsharp,0,0); return gTmp; })(),sig(LEVEL_D[l])); }
+    const gr=tc.createLinearGradient(0,0,0,h); let any=false;
+    for(const [y,d] of rows){ const t=clamp(Math.log2(Math.max(d,1)),0,need); const wt=Math.max(0,1-Math.abs(t-l)); if(wt>0) any=true; gr.addColorStop(clamp((y+PAD)/LH,0,1),'rgba(0,0,0,'+wt.toFixed(3)+')'); }
+    if(!any) continue;
+    tc.globalCompositeOperation='destination-in'; tc.fillStyle=gr; tc.fillRect(0,0,w,h); tc.globalCompositeOperation='source-over';
+    ac.globalCompositeOperation='lighter'; ac.imageSmoothingEnabled=true; ac.drawImage(cv,0,0,w,h,0,0,LW,LH);
+  }
+  ac.globalCompositeOperation='source-over';
+  cc.drawImage(gAcc,0,0);
+  cc.globalAlpha=1;
+  if(S.spot) layer(comp,c=>drawStand(c,Q),sig(Q.bpx(Q.dist+SPOT.back)));
+  if(S.tree) layer(comp,c=>drawTree(c,Q),sig(Q.bpx(Q.dist+TREE.back)));
+  const bg=cc.getImageData(PAD,PAD,MW,MH); toneMap(bg,G); mctx.putImageData(bg,0,0);
+  // 2. source lumineuse (bokeh)
+  const src=drawEmitters(mctx,Q,G);
+  // 3. personnage (premier plan)
+  const fc=fg.getContext('2d'); fc.setTransform(1,0,0,1,0,0); fc.clearRect(0,0,LW,LH);
+  layer(fg,c=>drawPerson(c,Q),sig(Q.bpx(Q.dist)));
+  const fd=fc.getImageData(PAD,PAD,MW,MH); toneMap(fd,G); tmp.getContext('2d').putImageData(fd,0,0); mctx.drawImage(tmp,0,0);
+  // 4. reflets parasites
+  drawFlares(mctx,Q,G,src);
+  const icR=Q.cfg.ic/2/Q.F.w*MW, half=Math.hypot(MW/2,MH/2);
+  if(icR<half*1.04){ const vg=mctx.createRadialGradient(MW/2,MH/2,icR*0.86,MW/2,MH/2,icR*1.03); vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(0.7,'rgba(0,0,0,.75)'); vg.addColorStop(1,'rgba(0,0,0,1)'); mctx.fillStyle=vg; mctx.fillRect(0,0,MW,MH); }
+  if(S.peak) peaking();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Plan de scène et cames                                             */
+/* ------------------------------------------------------------------ */
+function drawPlan(Q, dof){
+  const cv=$('plan'), c=cv.getContext('2d'), W=cv.width, H=cv.height; c.clearRect(0,0,W,H);
+  const x0=-20.8, x1=22.5, sc=(W-16)/(x1-x0), gy=H-34; const X=w=>8+(w-x0)*sc, Y=h=>gy-h*sc;
+  c.fillStyle='#1e2a17'; c.fillRect(0,gy,W,H-gy); c.strokeStyle='#34383c'; c.beginPath(); c.moveTo(0,gy); c.lineTo(W,gy); c.stroke();
+  // échelle
+  c.fillStyle='#6d706c'; c.font='500 10px "IBM Plex Mono",monospace'; c.textAlign='center';
+  for(let m=-20;m<=20;m+=5){ c.fillRect(X(m)-0.5,gy,1,5); c.fillText((m===0?'0':(m>0?'+':'')+m)+' m',X(m),gy+16); }
+  const cam=-Q.dist;
+  // champ vertical
+  const halfV=Math.atan(Q.F.h/2/Q.feff); const L=45;
+  c.fillStyle='rgba(239,180,63,.08)'; c.beginPath(); c.moveTo(X(cam),Y(CAM_H)); c.lineTo(X(cam+L),Y(CAM_H+Math.tan(halfV)*L)); c.lineTo(X(cam+L),Y(CAM_H-Math.tan(halfV)*L)); c.fill();
+  c.strokeStyle='rgba(239,180,63,.45)'; c.beginPath(); c.moveTo(X(cam),Y(CAM_H)); c.lineTo(X(cam+L),Y(CAM_H+Math.tan(halfV)*L)); c.moveTo(X(cam),Y(CAM_H)); c.lineTo(X(cam+L),Y(CAM_H-Math.tan(halfV)*L)); c.stroke();
+  // profondeur de champ
+  if(dof){ const n=cam+dof.near, f=isFinite(dof.far)?cam+dof.far:x1+5; c.fillStyle='rgba(239,180,63,.22)'; c.fillRect(X(n),Y(7.2),Math.max(1.5,X(f)-X(n)),Y(0)-Y(7.2)); }
+  if(isFinite(Q.D)&&cam+Q.D<x1){ c.strokeStyle='#ece8df'; c.setLineDash([3,3]); c.beginPath(); c.moveTo(X(cam+Q.D),Y(7.4)); c.lineTo(X(cam+Q.D),gy); c.stroke(); c.setLineDash([]); }
+  // projecteur
+  if(S.spot){ c.strokeStyle='#8fc3ea'; c.lineWidth=1.5; c.beginPath(); c.moveTo(X(20),gy); c.lineTo(X(20),Y(1.9)); c.stroke(); c.fillStyle='#8fc3ea'; c.fillRect(X(20)-4,Y(2.25),8,Y(1.85)-Y(2.25)); c.fillStyle='rgba(143,195,234,.35)'; c.beginPath(); c.moveTo(X(20)-3,Y(2.05)); c.lineTo(X(17),Y(2.6)); c.lineTo(X(17),Y(1.5)); c.fill(); }
+  // arbre
+  if(S.tree){ c.fillStyle='#4a3626'; c.fillRect(X(10)-2,Y(2.7),4,Y(0)-Y(2.7)); c.fillStyle='#7fbf6a'; c.globalAlpha=.8; c.beginPath(); c.ellipse(X(10),Y(4.4),2.2*sc,2.0*sc,0,0,7); c.fill(); c.globalAlpha=1; }
+  // personnage
+  c.fillStyle='#efb43f'; c.beginPath(); c.arc(X(0),Y(1.63),0.11*sc,0,7); c.fill(); c.fillRect(X(0)-0.2*sc*0.5,Y(1.5),0.2*sc,Y(0)-Y(1.5));
+  // caméra
+  c.fillStyle='#ece8df'; c.fillRect(X(cam)-14,Y(CAM_H)-6,14,12); c.fillStyle='#9b9d98'; c.fillRect(X(cam),Y(CAM_H)-4,8,8);
+  c.strokeStyle='#6d706c'; c.lineWidth=1.5; c.beginPath(); c.moveTo(X(cam)-7,Y(CAM_H)+6); c.lineTo(X(cam)-12,gy); c.moveTo(X(cam)-7,Y(CAM_H)+6); c.lineTo(X(cam)-2,gy); c.stroke(); c.lineWidth=1;
+  c.textAlign='left';
+}
+function drawCam(Q){
+  const cv=$('cam'), c=cv.getContext('2d'), W=cv.width, H=cv.height; c.clearRect(0,0,W,H);
+  const cfg=Q.cfg; const zA=-10, zB=O.IRIS_Z+40; const pl=38, pr=10, pt=14, pb=30;
+  const X=z=>pl+(z-zA)/(zB-zA)*(W-pl-pr); const lf0=Math.log(cfg.fmin), lf1=Math.log(cfg.fmax); const Y=f=>H-pb-(Math.log(f)-lf0)/(lf1-lf0)*(H-pt-pb);
+  c.font='500 11px "IBM Plex Mono",monospace'; c.fillStyle='#6d706c'; c.strokeStyle='#2a2d30'; c.textAlign='right';
+  for(const f of ZOOM_TICKS[cfg.id]){ if(f<cfg.fmin||f>cfg.fmax) continue; c.beginPath(); c.moveTo(pl,Y(f)); c.lineTo(W-pr,Y(f)); c.stroke(); c.fillText(f,pl-4,Y(f)+4); }
+  c.textAlign='center';
+  for(const [z,l] of [[O.G1A_Z,'G1a'],[O.G1C_Z,'G1c'],[O.IRIS_Z,'iris']]){ c.strokeStyle='#4a4e52'; c.beginPath(); c.moveTo(X(z),pt); c.lineTo(X(z),H-pb); c.stroke(); c.fillText(l,X(z),H-pb+14); }
+  c.strokeStyle='#efb43f'; c.setLineDash([3,3]); c.beginPath(); c.moveTo(X(Q.z1b),pt); c.lineTo(X(Q.z1b),H-pb); c.stroke(); c.setLineDash([]); c.fillStyle='#efb43f'; c.fillText('focus',X(Q.z1b),H-pb+26);
+  for(const [key,col,lab] of [['z2','#f08a5a','variateur'],['z3','#8fc3ea','compensateur']]){
+    c.strokeStyle=col; c.lineWidth=2; c.beginPath(); cfg.tab.forEach((t,i)=>{ const x=X(t[key]), y=Y(t.f); i?c.lineTo(x,y):c.moveTo(x,y); }); c.stroke(); c.lineWidth=1;
+    const p=Q.c[key]; c.fillStyle=col; c.beginPath(); c.arc(X(p),Y(Q.f),5,0,7); c.fill();
+    c.fillText(lab,X(cfg.tab[cfg.tab.length-1][key])+(key==='z2'?-28:24),pt+10);
+  }
+  c.strokeStyle='rgba(236,232,223,.5)'; c.beginPath(); c.moveTo(pl,Y(Q.f)); c.lineTo(W-pr,Y(Q.f)); c.stroke();
+  c.textAlign='left'; c.fillStyle='#9b9d98'; c.fillText('mm →',W-pr-40,H-6);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Profondeur de champ, textes                                        */
+/* ------------------------------------------------------------------ */
+function dofOf(Q){
+  const coc=Q.F.coc; const f=Z=>Q.blur(Z)-coc;
+  const dl=Q.delta(1e5); let Zc;
+  if(dl>=0) Zc=1e5; else { Zc=O.bisect(Z=>Q.delta(Z),0.3,1e5,70); if(!isFinite(Zc)) return null; }
+  if(f(Zc)>0) return null;
+  const near=f(0.3)<=0?0.3:O.bisect(f,0.3,Zc,60);
+  const far=f(1e5)<=0?Infinity:O.bisect(f,Zc,1e5,60);
+  return {near,far,sharp:Zc};
+}
+const dofPos = Z => { if(!isFinite(Z)) return 1; if(Z<=1) return 0; const T=[1,2,5,10,20]; for(let i=0;i<4;i++) if(Z<=T[i+1]) return (i+Math.log(Z/T[i])/Math.log(T[i+1]/T[i]))*0.2; return 0.8+0.2*(1-20/Z); };
+const fmtD = D => !isFinite(D)||D>500?'∞':fmt(D,D<10?2:1)+' m';
+const ndLabel = n => n?'ND '+fmt(n*0.3,1):'clair';
+
+function updateTexts(Q){
+  const cfg=Q.cfg, F=Q.F, T=Q.T, dof=dofOf(Q);
+  $('hdrLens').textContent=`${cfg.fmin}-${cfg.fmax} mm T${fmt(cfg.T,1)} · ${cfg.id==='FF'?'FF/VV':'S35'}`;
+  $('hdrLook').textContent=$('selLook').selectedOptions[0].textContent.replace(/ \(.*/,'');
+  $('outFocal'); $('outZoom').textContent=fmt(Q.f,Q.f<100?1:0)+' mm';
+  $('outIris').textContent='T'+fmt(T,1); $('outFocus').textContent=fmtD(S.D); $('outDist').textContent=fmt(S.dist,2)+' m';
+  $('outLux').textContent=fmt(S.lux,0)+' lux'; $('outBf').textContent=sgn(S.bf,3)+' mm'; $('outNd').textContent=ndLabel(S.nd);
+  const ev=exposureEV(Q); $('outMeter').textContent=(Math.abs(ev)<0.05?'±0,0':sgn(ev,1))+' IL';
+  const nd=$('needle'); nd.style.left=(50+clamp(ev,-3.3,3.3)/3*44)+'%'; nd.classList.toggle('over',Math.abs(ev)>3);
+  const eq=Q.f*FORMATS.FF.w/F.w*(F.id==='FF'?1:1);
+  $('sensorSpec').innerHTML=`Mode <b>${F.mode}</b><br>Cercle de confusion <b>${fmt(F.coc,3)} mm</b><br>Équivalent 24×36 <b>${fmt(Q.f*36/F.w,0)} mm</b><br>Champ horizontal <b>${fmt(2*Math.atan(MW/2/Q.A)*DEG,1)}°</b>`+(F.id==='B4'?'<br><span class="ko">La VENICE 2 n’a pas de mode 2/3″ : recadrage simulé au centre du capteur.</span>':'')+(cfg.ic<Math.hypot(F.w,F.w*9/16)?`<br><span class="ko">Le cercle image de l’optique (Ø ${fmt(cfg.ic,1)} mm) ne couvre pas ce format : coins noirs. Passer à l’arrière FF/VV.</span>`:'');
+  $('lensSpec').innerHTML=`Configuration <b>${cfg.id==='FF'?'FF/VV (arrière IRO FF)':'S35 (arrière IRO S35)'}</b><br>Focales <b>${cfg.fmin}–${cfg.fmax} mm</b> · <b>T${fmt(cfg.T,1)}</b> sans rampe<br>Cercle image <b>Ø ${fmt(cfg.ic,1)} mm</b> · MOD <b>${fmt(cfg.mod,2)} m</b><br>Longueur <b>${cfg.len} mm</b> · iris 9 lames<br>Focale effective à ${fmtD(S.D)} <b>${fmt(Q.feff,1)} mm</b><br>Ø iris <b>${fmt(Q.rStop*2,1)} mm</b> (constant sur le zoom)<br>Pupille d’entrée <b>Ø ${fmt(Q.f/T,1)} mm</b><br><span style="color:var(--dim)">Positions depuis la frontale :</span><br>Focus <b>${fmt(Q.z1b,1)}</b> · Variateur <b>${fmt(Q.c.z2,1)}</b><br>Compensateur <b>${fmt(Q.c.z3,1)}</b> · Arrière <b>${sgn(Q.bf,3)}</b> mm`;
+  $('lensHint').textContent=`Schéma pédagogique : ${Q.els.length} lentilles minces en ${new Set(Q.els.map(e=>e.g)).size} groupes, calculées en optique paraxiale. La formule réelle d’Angénieux n’est pas publique ; la cinématique est la même : focus interne, variateur, compensateur et groupe arrière interchangeable (IRO). Limite du modèle : avec un seul groupe de focus, il « respire » (le cadre se resserre quand on fait le point près) ; l’Optimo Ultra corrige cela avec des groupes flottants.`;
+  // profondeur de champ
+  if(dof){ $('outDof').textContent=fmtD(dof.near)+' → '+fmtD(dof.far); const a=dofPos(dof.near), b=dofPos(dof.far); $('dofZone').style.left=a*100+'%'; $('dofZone').style.width=Math.max(0.6,(b-a)*100)+'%'; }
+  else { $('outDof').textContent='aucune zone nette'; $('dofZone').style.width='0'; }
+  $('dofPt').style.left=dofPos(S.D)*100+'%';
+  $('dofS').style.left=dofPos(Q.objs[0].Z)*100+'%'; $('dofT').style.left=dofPos(Q.objs[1].Z)*100+'%'; $('dofL').style.left=dofPos(Q.objs[2].Z)*100+'%';
+  $('dofT').hidden=!S.tree; $('dofL').hidden=!S.spot;
+  let fs='';
+  for(const o of Q.objs){ if(o.id!=='subj'&&!(o.id==='tree'?S.tree:S.spot)) continue; const ok=o.blur<=F.coc;
+    fs+=`<span style="color:${o.col}">●</span> ${o.name} ${fmt(o.Z,1)} m · image ${sgn(o.delta,3)} mm · flou <b class="${ok?'ok':''}">${fmt(o.blur*1000,0)} µm</b><br>`; }
+  if(S.dist<cfg.mod) fs+=`<span class="ko">Personnage plus près que la distance minimale (${fmt(cfg.mod,2)} m) : impossible de faire le point.</span>`;
+  $('focusSpec').innerHTML=fs;
+  // moniteur
+  const lookTxt=$('selLook').selectedOptions[0].textContent.replace(/ \(.*/,'');
+  $('evfL').innerHTML=`<span class="rec">●</span> VENICE 2 · ${F.tag} · ${lookTxt}`;
+  $('evfR').textContent=`ISO ${S.iso} · ${ndLabel(S.nd)} · 1/48 · ${fmt(S.lux,0)} lux`;
+  $('evf').innerHTML=`<span class="em">T${fmt(T,1)}</span><span>${fmt(Q.f,Q.f<100?1:0)} mm</span><span>⊙ ${fmtD(S.D)}</span><span>sujet ${fmt(S.dist,2)} m</span><span>${(Math.abs(ev)<0.05?'±0,0':sgn(ev,1))} IL</span>`+(Math.abs(S.bf)>0.0005?`<span class="em">tirage ${sgn(S.bf,3)}</span>`:'');
+  $('where').innerHTML=`<span>Caméra → sujet <b>${fmt(S.dist,2)} m</b></span><span>Point <b>${fmtD(S.D)}</b> · <b>T${fmt(T,1)}</b></span><span>Focale <b>${fmt(Q.f,Q.f<100?1:0)} mm</b> (${fmt(Q.f*36/F.w,0)} éq.)</span><span>Tirage <b>${sgn(S.bf,3)} mm</b></span>`;
+  $('rfOut').textContent=fmtD(S.D); $('rzOut').textContent=fmt(Q.f,Q.f<100?1:0)+' mm'; $('riOut').textContent='T'+fmt(T,1);
+  return dof;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Explications « ce qui bouge »                                      */
+/* ------------------------------------------------------------------ */
+function snapTargets(){ const cfg=CFG(); const f=focalOf(S.zp,cfg), c=camAt(cfg,f); return {cfg,f,z1b:solveFocus(cfg,S.D),z2:c.z2,z3:c.z3,bf:S.bf,T:Tof(),D:S.D,dist:S.dist,fmt:S.fmt,lens:S.lens}; }
+let gesture=null, gestureT=0;
+const dir = d => d>0?'recule vers le capteur':'avance vers la frontale';
+function noteChange(kind){
+  const now=performance.now(); const after=snapTargets();
+  if(!gesture||gesture.kind!==kind||now-gestureT>900) gesture={kind,before:lastSnap};
+  gestureT=now; const b=gesture.before, a=after; lastSnap=after;
+  const mv={};
+  const add=(g,from,to)=>{ if(Math.abs(to-from)>0.01) mv[g]={from,to}; };
+  add('G1b',b.z1b,a.z1b); add('G2',b.z2,a.z2); add('G3',b.z3,a.z3); if(a.cfg===b.cfg) a.cfg.rears.forEach(r=>add(r[0],r[1]+b.bf,r[1]+a.bf));
+  moveInfo={groups:mv,t:now};
+  const d=(x,y)=>`<em>${sgn(y-x,2)} mm</em>`; let h='';
+  if(kind==='zoom'){
+    h=`<b>Zoom ${fmt(b.f,0)} → ${fmt(a.f,0)} mm.</b> <span class="mv">Variateur ${d(b.z2,a.z2)} (${dir(a.z2-b.z2)}) · compensateur ${d(b.z3,a.z3)} · focus interne 0,00 mm · groupe arrière 0,00 mm.</span> Le variateur change le grandissement ; le compensateur suit sa came pour ramener l’image au même endroit : <b>la netteté est conservée</b>`+(Math.abs(S.bf)>0.002?`, sauf que le tirage est déréglé de ${sgn(S.bf,3)} mm : la netteté « fuit » quand on change de focale.`:'.');
+  } else if(kind==='focus'){
+    h=`<b>Mise au point ${fmtD(b.D)} → ${fmtD(a.D)}.</b> <span class="mv">Seul le groupe de focus interne bouge : ${d(b.z1b,a.z1b)}.</span> La frontale reste fixe (focalisation interne) : l’optique ne change pas de longueur et l’image intermédiaire reste au même endroit pour toutes les focales.`;
+  } else if(kind==='bf'){
+    h=`<b>Tirage ${sgn(b.bf,3)} → ${sgn(a.bf,3)} mm.</b> <span class="mv">Groupe arrière ${d(b.bf,a.bf)}.</span> Le plan image se déplace d’autant par rapport au capteur. Au télé, la bague de point peut compenser une petite erreur ; au grand angle, non : c’est pourquoi on règle le tirage au grand angle après avoir fait le point au télé.`;
+  } else if(kind==='iris'){
+    h=`<b>Iris T${fmt(b.T,1)} → T${fmt(a.T,1)}.</b> <span class="mv">Ø du diaphragme ${fmt(CFG().rIris*2*CFG().T/b.T,1)} → ${fmt(CFG().rIris*2*CFG().T/a.T,1)} mm, aucune lentille ne bouge.</span> Les cônes de lumière s’affinent : ${a.T>b.T?'plus de profondeur de champ, bokeh plus petit et polygonal, moins de lumière':'moins de profondeur de champ, bokeh plus grand et rond, plus de lumière'}.`;
+  } else if(kind==='dist'){
+    h=`<b>Caméra → personnage ${fmt(b.dist,2)} → ${fmt(a.dist,2)} m.</b> <span class="mv">Aucune lentille ne bouge.</span> La mise au point reste à ${fmtD(a.D)} : ${Math.abs(a.D-a.dist)<0.05?'le personnage est net.':'le personnage n’est plus dans le plan de netteté, il faut refaire le point (bouton « Net : sujet »).'} Le grandissement change, l’arbre et le projecteur paraissent ${a.dist>b.dist?'plus':'moins'} grands par rapport au personnage.`;
+  } else if(kind==='fmt'){
+    const r=FORMATS[b.fmt].w/FORMATS[a.fmt].w, cover=a.cfg.ic>=Math.hypot(FORMATS[a.fmt].w,FORMATS[a.fmt].w*9/16);
+    h=`<b>Capteur ${FORMATS[b.fmt].name} → ${FORMATS[a.fmt].name}.</b> <span class="mv">Aucune lentille ne bouge.</span> Seule la zone lue sur le capteur de la VENICE 2 change : le champ ${r>1?'se resserre':'s’élargit'} (×${fmt(r>1?r:1/r,2)}). Même optique, même diaphragme, même lumière : <b>l’exposition ne change pas</b>, mais la profondeur de champ et le cercle de confusion changent.`+(cover?'':` Le cercle image de l’arrière ${a.cfg.id} (Ø ${fmt(a.cfg.ic,1)} mm) est trop petit : coins noirs, il faut l’arrière FF/VV.`);
+  } else if(kind==='lens'){
+    h=`<b>Groupe arrière ${b.cfg.id==='FF'?'FF/VV':'S35'} → ${a.cfg.id==='FF'?'FF/VV':'S35'}.</b> <span class="mv">On remplace le groupe arrière (IRO), l’avant de l’optique ne change pas.</span> L’optique devient un ${a.cfg.fmin}-${a.cfg.fmax} mm T${fmt(a.cfg.T,1)} : focales ×${fmt(a.cfg.fmax/b.cfg.fmax,2)}, cercle image Ø ${fmt(a.cfg.ic,1)} mm`+(a.cfg.T>b.cfg.T?`, ouverture maximale plus petite (${fmt(Math.log2((a.cfg.T/b.cfg.T)**2),1)} IL de lumière en moins à pleine ouverture).`:'.');
+  }
+  $('explain').innerHTML=h;
+}
+let lastSnap=null;
+
+/* ------------------------------------------------------------------ */
+/*  Bagues de l'objectif                                               */
+/* ------------------------------------------------------------------ */
+function Ring(cv, o){
+  const ctx=cv.getContext('2d'); let W=0,H=0,dpr=1, drag=null;
+  function size(){ const r=cv.getBoundingClientRect(); dpr=Math.min(2,window.devicePixelRatio||1); W=r.width; H=r.height; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  function draw(){
+    if(!W) size(); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0c0d0e'); g.addColorStop(0.5,'#202326'); g.addColorStop(1,'#0c0d0e'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(255,255,255,.05)'; const p=o.get(); for(let x=-((p*1.0)%6);x<W;x+=6){ ctx.beginPath(); ctx.moveTo(x,H-9); ctx.lineTo(x,H); ctx.stroke(); }
+    ctx.font='500 11px "IBM Plex Mono",monospace'; ctx.textAlign='center';
+    for(const t of o.ticks()){ const x=W/2+(t.p-p); if(x<-30||x>W+30) continue; const fade=1-Math.min(1,Math.abs(x-W/2)/(W/2))*0.65;
+      ctx.globalAlpha=fade; ctx.fillStyle=t.major?'#ece8df':'#6d706c'; ctx.fillRect(x-0.5,4,1,t.major?9:5); if(t.l) ctx.fillText(t.l,x,27); }
+    ctx.globalAlpha=1; ctx.fillStyle='#efb43f'; ctx.beginPath(); ctx.moveTo(W/2-5,H); ctx.lineTo(W/2+5,H); ctx.lineTo(W/2,H-7); ctx.fill(); ctx.fillRect(W/2-0.75,0,1.5,H-8);
+  }
+  cv.addEventListener('pointerdown',e=>{ drag={x:e.clientX,p:o.get()}; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove',e=>{ if(!drag) return; o.set(drag.p-(e.clientX-drag.x)); });
+  const end=()=>{ drag=null; }; cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); o.set(o.get()+Math.sign(e.deltaY)*12); },{passive:false});
+  return {draw,size};
+}
+const FOCUS_SPAN=620, ZOOM_SPAN=620, IRIS_STEP=34;
+const invMod = () => 1/CFG().mod;
+const focusPos = D => FOCUS_SPAN*(1-(isFinite(D)?1/D:0)/invMod());
+const posFocus = p => { const inv=invMod()*(1-clamp(p,0,FOCUS_SPAN)/FOCUS_SPAN); return inv<1e-4?Infinity:1/inv; };
+const rings = {
+  focus: Ring($('ringFocus'),{get:()=>focusPos(S.D),set:p=>{ S.D=posFocus(p); onChange('focus'); },
+    ticks:()=>{ const m=CFG().mod; return [m].concat(FOCUS_TICKS.filter(d=>d>m*1.04)).map(d=>({p:focusPos(d),l:isFinite(d)?String(d).replace('.',','):'∞',major:true})); }}),
+  zoom: Ring($('ringZoom'),{get:()=>S.zp*ZOOM_SPAN,set:p=>{ S.zp=clamp(p/ZOOM_SPAN,0,1); onChange('zoom'); },
+    ticks:()=>{ const cfg=CFG(); return ZOOM_TICKS[cfg.id].map(f=>({p:Math.log(f/cfg.fmin)/Math.log(cfg.fmax/cfg.fmin)*ZOOM_SPAN,l:String(f),major:true})); }}),
+  iris: Ring($('ringIris'),{get:()=>S.iris*IRIS_STEP,set:p=>{ const n=tList(CFG()).length-1; const i=clamp(Math.round(p/IRIS_STEP),0,n); if(i!==S.iris){ S.iris=i; onChange('iris'); } },
+    ticks:()=>tList(CFG()).map((t,i)=>({p:i*IRIS_STEP,l:[2.8,4,4.2,5.6,8,11,16,22].includes(t)?String(t).replace('.',','):'',major:[2.8,4,4.2,5.6,8,11,16,22].includes(t)})) }),
+};
+
+/* ------------------------------------------------------------------ */
+/*  Commandes                                                          */
+/* ------------------------------------------------------------------ */
+function syncInputs(){
+  const cfg=CFG();
+  $('rngZoom').value=Math.round(S.zp*1000);
+  $('rngFocus').value=Math.round(1000*(1-(isFinite(S.D)?1/S.D:0)/invMod()));
+  $('rngIris').max=tList(cfg).length-1; $('rngIris').value=S.iris;
+  $('rngDist').value=Math.round(S.dist*100); $('rngBf').value=Math.round(S.bf*1000); $('rngNd').value=S.nd;
+  document.querySelectorAll('#segFmt button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.fmt===S.fmt));
+  document.querySelectorAll('#segIso button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.iso===S.iso));
+  document.querySelectorAll('#segLens button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lens===S.lens));
+  $('rngLux').value=Math.round(50*Math.log10(S.lux/1000));
+  document.querySelectorAll('#segVex button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.vex===S.vex));
+}
+function onChange(kind){
+  if(S.D<CFG().mod) S.D=CFG().mod;
+  syncInputs(); if(kind) noteChange(kind); dirty=true;
+}
+$('rngZoom').addEventListener('input',e=>{ S.zp=e.target.value/1000; onChange('zoom'); });
+$('rngFocus').addEventListener('input',e=>{ const inv=invMod()*(1-e.target.value/1000); S.D=inv<1e-4?Infinity:1/inv; onChange('focus'); });
+$('rngIris').addEventListener('input',e=>{ S.iris=+e.target.value; onChange('iris'); });
+$('rngDist').addEventListener('input',e=>{ S.dist=e.target.value/100; onChange('dist'); });
+$('rngBf').addEventListener('input',e=>{ S.bf=e.target.value/1000; onChange('bf'); });
+$('rngNd').addEventListener('input',e=>{ S.nd=+e.target.value; onChange(); });
+$('rngStep').addEventListener('input',e=>{ stopPlay(); const v=+e.target.value; S.step=v>=+e.target.max?Infinity:v; dirty=true; });
+document.querySelectorAll('#segFmt button').forEach(b=>b.addEventListener('click',()=>{ S.fmt=b.dataset.fmt; onChange('fmt'); }));
+document.querySelectorAll('#segLens button').forEach(b=>b.addEventListener('click',()=>{
+  if(S.lens===b.dataset.lens) return; const T0=Tof(); S.lens=b.dataset.lens; const cfg=prepare(CFG());
+  const l=tList(cfg); let i=l.findIndex(t=>t>=T0-0.01); S.iris=i<0?l.length-1:i;
+  S.D=Math.max(S.D,cfg.mod); onChange('lens'); }));
+$('rngLux').addEventListener('input',e=>{ const v=1000*Math.pow(10,e.target.value/50); S.lux=v>=10000?Math.round(v/1000)*1000:Math.round(v/100)*100; onChange(); });
+document.querySelectorAll('#segIso button').forEach(b=>b.addEventListener('click',()=>{ S.iso=+b.dataset.iso; onChange(); }));
+document.querySelectorAll('#segVex button').forEach(b=>b.addEventListener('click',()=>{ S.vex=+b.dataset.vex; syncInputs(); dirty=true; }));
+document.querySelectorAll('[data-fp]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.fp; S.D=Math.max(CFG().mod, S.dist+(k==='tree'?TREE.back:k==='spot'?SPOT.back:0)); onChange('focus'); }));
+$('selLook').addEventListener('change',e=>{ S.look=e.target.value; dirty=true; });
+$('btnBfRnd').addEventListener('click',()=>{ S.bf=(Math.random()<.5?-1:1)*(0.12+Math.random()*0.25); S.bf=Math.round(S.bf*1000)/1000; onChange('bf'); });
+$('btnBfZero').addEventListener('click',()=>{ S.bf=0; onChange('bf'); });
+for(const [id,k] of [['rSubj','subj'],['rTree','tree'],['rSpot','spot'],['rField','field']]) $(id).addEventListener('change',e=>{ S.rays[k]=e.target.checked; dirty=true; });
+for(const [id,k] of [['chkTree','tree'],['chkSpot','spot'],['chkFlare','flare'],['chkPeak','peak'],['chkLoupe','loupe']]) $(id).addEventListener('change',e=>{ S[k]=e.target.checked; dirty=true; });
+$('chkGrid').addEventListener('change',e=>{ $('grid3').hidden=!e.target.checked; });
+let playT=null;
+function stopPlay(){ if(playT){ clearInterval(playT); playT=null; $('btnPlay').textContent='▶ Lecture'; } }
+$('btnPlay').addEventListener('click',()=>{
+  if(playT){ stopPlay(); return; }
+  const N=+$('rngStep').max; S.step=(isFinite(S.step)&&S.step<N)?S.step:0; dirty=true; $('btnPlay').textContent='❚❚ Pause';
+  playT=setInterval(()=>{ S.step++; if(S.step>=N){ S.step=Infinity; stopPlay(); } $('rngStep').value=isFinite(S.step)?S.step:N; dirty=true; },1300);
+  $('rngStep').value=S.step;
+});
+$('btnAll').addEventListener('click',()=>{ stopPlay(); S.step=Infinity; $('rngStep').value=$('rngStep').max; dirty=true; });
+// travelling
+let dollyT=null;
+document.querySelectorAll('[data-dolly]').forEach(b=>{
+  const go=()=>{ S.dist=clamp(S.dist-(+b.dataset.dolly)*0.05,1,20); onChange('dist'); };
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); go(); clearInterval(dollyT); dollyT=setInterval(go,60); });
+  for(const ev of ['pointerup','pointerleave','pointercancel']) b.addEventListener(ev,()=>{ clearInterval(dollyT); });
+});
+$('planWrap').addEventListener('click',e=>{ const cv=$('plan'), r=cv.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width*cv.width; const x0=-20.8, x1=22.5, sc=(cv.width-16)/(x1-x0); const w=(x-8)/sc+x0; if(w<-0.9){ S.dist=clamp(-w,1,20); onChange('dist'); } });
+$('mon').addEventListener('wheel',e=>{ e.preventDefault(); if(e.shiftKey){ const p=focusPos(S.D)-Math.sign(e.deltaY||e.deltaX)*14; S.D=posFocus(p); onChange('focus'); } else { S.zp=clamp(S.zp-Math.sign(e.deltaY)*0.015,0,1); onChange('zoom'); } },{passive:false});
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  let k=null;
+  switch(e.key){
+    case 'ArrowUp': S.dist=clamp(S.dist-(e.shiftKey?0.01:0.05),1,20); k='dist'; break;
+    case 'ArrowDown': S.dist=clamp(S.dist+(e.shiftKey?0.01:0.05),1,20); k='dist'; break;
+    case 'ArrowRight': S.zp=clamp(S.zp+0.01,0,1); k='zoom'; break;
+    case 'ArrowLeft': S.zp=clamp(S.zp-0.01,0,1); k='zoom'; break;
+    case ']': S.D=posFocus(focusPos(S.D)+8); k='focus'; break;
+    case '[': S.D=posFocus(focusPos(S.D)-8); k='focus'; break;
+    case 't': case 'T': S.iris=clamp(S.iris+1,0,tList(CFG()).length-1); k='iris'; break;
+    case 'y': case 'Y': S.iris=clamp(S.iris-1,0,tList(CFG()).length-1); k='iris'; break;
+  }
+  if(k){ e.preventDefault(); onChange(k); }
+});
+
+/* ------------------------------------------------------------------ */
+/*  Mise en page et boucle                                             */
+/* ------------------------------------------------------------------ */
+function fitFrame(){
+  const m=document.querySelector('.monitor'), r=m.getBoundingClientRect(); const w=r.width-16, h=r.height-16;
+  const fw=Math.max(120,Math.min(w,h*16/9)); const f=$('frame'); f.style.width=fw+'px'; f.style.height=(fw*9/16)+'px';
+}
+function resize(){ sizeOptics(); fitFrame(); Object.values(rings).forEach(r=>r.size()); dirty=true; }
+window.addEventListener('resize',resize);
+if(window.ResizeObserver){ new ResizeObserver(()=>resize()).observe($('vf')); }
+
+let lastT=performance.now(), lastMon=0, lastTxt=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  const t=tgt(); const k=1-Math.exp(-dt*7); let anim=false;
+  for(const key of ['zp','invD','bf','T','dist']){ const d=t[key]-cur[key]; const eps=key==='invD'?1e-6:key==='bf'?1e-5:1e-4; if(Math.abs(d)>eps){ cur[key]+=d*k; anim=true; } else cur[key]=t[key]; }
+  const moving = moveInfo && now-moveInfo.t<3600;
+  if(anim||dirty||moving){
+    const Q=compute();
+    drawOptics(Q); stepCard(Q);
+    if(anim||dirty){ if(now-lastMon>45||!anim){ renderMonitor(Q); lastMon=now; } }
+    if(anim||dirty||now-lastTxt>200){ const dof=updateTexts(Q); drawPlan(Q,dof); drawCam(Q); lastTxt=now; }
+    Object.values(rings).forEach(r=>r.draw());
+    dirty=false;
+  }
+  requestAnimationFrame(frame);
+}
+
+function start(){
+  prepare(O.CFG.S35);
+  snap(); lastSnap=snapTargets(); buildLUT(); syncInputs(); resize();
+  $('explain').innerHTML='<b>Mode d’emploi.</b> Tournez les bagues (en bas) ou les curseurs : la coupe montre quels groupes de lentilles bougent, le moniteur VENICE montre l’image obtenue. Lancez « ▶ Lecture » pour suivre les rayons verre après verre.';
+  $('loading').hidden=true;
+  requestAnimationFrame(frame);
+  setTimeout(()=>prepare(O.CFG.FF),300);
+}
+window.__sim={S,cur,compute,prepare,O,renderMonitor,drawOptics};
+setTimeout(()=>{ try{ start(); }catch(err){ console.error(err); const l=$('loading'); l.hidden=false; l.innerHTML='<div style="color:#f08a74;max-width:520px">Le simulateur n’a pas pu démarrer.<br>'+String(err.message||err).replace(/</g,'&lt;')+'</div>'; } },30);
+})();
+</script>
+</body></html>
